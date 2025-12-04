@@ -5,6 +5,7 @@ from copy import deepcopy
 from functools import cached_property
 
 import numpy as np
+import inspect
 from scipy.integrate import BDF, DOP853, LSODA, RK23, RK45, OdeSolver, Radau
 
 from rocketpy.simulation.flight_data_exporter import FlightDataExporter
@@ -94,6 +95,12 @@ class Flight:
         function evaluation points and then interpolation is used to
         calculate them and feed the triggers. Can greatly improve run
         time in some cases.
+    Note
+    ----
+    Calculating the derivative `u_dot` inside parachute trigger checks will
+    cause additional calls to the equations of motion (extra physics
+    evaluations). This increases CPU cost but enables realistic avionics
+    algorithms that rely on accelerometer data.
     Flight.terminate_on_apogee : bool
         Whether to terminate simulation when rocket reaches apogee.
     Flight.solver : scipy.integrate.LSODA
@@ -487,6 +494,7 @@ class Flight:
         name="Flight",
         equations_of_motion="standard",
         ode_solver="LSODA",
+        acceleration_noise_function=None,
     ):
         """Run a trajectory simulation.
 
@@ -600,6 +608,13 @@ class Flight:
         self.name = name
         self.equations_of_motion = equations_of_motion
         self.ode_solver = ode_solver
+        # Function that returns accelerometer noise vector [ax_noise, ay_noise, az_noise]
+        # It should be a callable that returns an array-like of length 3.
+        self.acceleration_noise_function = (
+            acceleration_noise_function
+            if acceleration_noise_function is not None
+            else (lambda: np.zeros(3))
+        )
 
         # Controller initialization
         self.__init_controllers()
@@ -739,11 +754,14 @@ class Flight:
                     ) = self.__calculate_and_save_pressure_signals(
                         parachute, node.t, self.y_sol[2]
                     )
-                    if parachute.triggerfunc(
+                    if self._evaluate_parachute_trigger(
+                        parachute,
                         noisy_pressure,
                         height_above_ground_level,
                         self.y_sol,
                         self.sensors,
+                        phase.derivative,
+                        self.t,
                     ):
                         # Remove parachute from flight parachutes
                         self.parachutes.remove(parachute)
@@ -772,8 +790,7 @@ class Flight:
                             lambda self, parachute_porosity=parachute.porosity: setattr(
                                 self, "parachute_porosity", parachute_porosity
                             ),
-                            lambda self,
-                            added_mass_coefficient=parachute.added_mass_coefficient: setattr(
+                            lambda self, added_mass_coefficient=parachute.added_mass_coefficient: setattr(
                                 self,
                                 "parachute_added_mass_coefficient",
                                 added_mass_coefficient,
@@ -998,11 +1015,14 @@ class Flight:
                                     )
 
                                     # Check for parachute trigger
-                                    if parachute.triggerfunc(
+                                    if self._evaluate_parachute_trigger(
+                                        parachute,
                                         noisy_pressure,
                                         height_above_ground_level,
                                         overshootable_node.y_sol,
                                         self.sensors,
+                                        phase.derivative,
+                                        overshootable_node.t,
                                     ):
                                         # Remove parachute from flight parachutes
                                         self.parachutes.remove(parachute)
@@ -1020,30 +1040,25 @@ class Flight:
                                             i += 1
                                         # Create flight phase for time after inflation
                                         callbacks = [
-                                            lambda self,
-                                            parachute_cd_s=parachute.cd_s: setattr(
+                                            lambda self, parachute_cd_s=parachute.cd_s: setattr(
                                                 self, "parachute_cd_s", parachute_cd_s
                                             ),
-                                            lambda self,
-                                            parachute_radius=parachute.radius: setattr(
+                                            lambda self, parachute_radius=parachute.radius: setattr(
                                                 self,
                                                 "parachute_radius",
                                                 parachute_radius,
                                             ),
-                                            lambda self,
-                                            parachute_height=parachute.height: setattr(
+                                            lambda self, parachute_height=parachute.height: setattr(
                                                 self,
                                                 "parachute_height",
                                                 parachute_height,
                                             ),
-                                            lambda self,
-                                            parachute_porosity=parachute.porosity: setattr(
+                                            lambda self, parachute_porosity=parachute.porosity: setattr(
                                                 self,
                                                 "parachute_porosity",
                                                 parachute_porosity,
                                             ),
-                                            lambda self,
-                                            added_mass_coefficient=parachute.added_mass_coefficient: setattr(
+                                            lambda self, added_mass_coefficient=parachute.added_mass_coefficient: setattr(
                                                 self,
                                                 "parachute_added_mass_coefficient",
                                                 added_mass_coefficient,
@@ -1123,6 +1138,88 @@ class Flight:
         )
 
         return noisy_pressure, height_above_ground_level
+
+    def _evaluate_parachute_trigger(
+        self, parachute, pressure, height, y, sensors, derivative_func, t
+    ):
+        """Evaluate parachute trigger, optionally computing u_dot (acceleration).
+
+        This helper preserves backward compatibility with existing trigger
+        signatures and will compute ``u_dot`` only if the original user
+        provided trigger function expects an acceleration argument (detected
+        by parameter name such as 'u_dot', 'udot', 'acc', or 'acceleration').
+
+        Parameters
+        ----------
+        parachute : Parachute
+            Parachute object.
+        pressure : float
+            Noisy pressure value passed to trigger.
+        height : float
+            Height above ground level passed to trigger.
+        y : array
+            State vector at evaluation time.
+        sensors : list
+            Sensors list passed to trigger.
+        derivative_func : callable
+            Function to compute derivatives: derivative_func(t, y)
+        t : float
+            Time at which to evaluate derivatives.
+
+        Returns
+        -------
+        bool
+            True if trigger condition met, False otherwise.
+        """
+        # If original trigger is not callable (e.g. numeric or 'apogee'),
+        # use the prepared wrapper in Parachute
+        trig_original = parachute.trigger
+        if not callable(trig_original):
+            return parachute.triggerfunc(pressure, height, y, sensors)
+
+        try:
+            sig = inspect.signature(trig_original)
+            params = list(sig.parameters.values())
+        except (ValueError, TypeError):
+            return parachute.triggerfunc(pressure, height, y, sensors)
+
+        # Detect whether the user-provided trigger expects acceleration
+        acc_names = {"u_dot", "udot", "acc", "acceleration"}
+        wants_u_dot = any(p.name in acc_names for p in params)
+        wants_sensors = any("sensor" in p.name for p in params)
+
+        if wants_u_dot:
+            # Compute derivative and add optional accelerometer noise
+            u_dot = np.array(derivative_func(t, y), dtype=float)
+            try:
+                noise = np.asarray(self.acceleration_noise_function())
+                if noise.size == 3:
+                    # u_dot layout: [vx, vy, vz, ax, ay, az, ...]
+                    u_dot[3:6] = u_dot[3:6] + noise
+            except Exception:
+                # If noise function fails, ignore and continue
+                pass
+
+            # Call user function according to detected signature
+            try:
+                if wants_sensors:
+                    # common case: (p, h, y, sensors, u_dot)
+                    return trig_original(pressure, height, y, sensors, u_dot)
+                # fallback by arg count
+                if len(params) == 4:
+                    # could be (p, h, y, u_dot)
+                    return trig_original(pressure, height, y, u_dot)
+                if len(params) == 5:
+                    # could be (p, h, y, sensors, u_dot)
+                    return trig_original(pressure, height, y, sensors, u_dot)
+                # try calling with u_dot as kwarg
+                return trig_original(pressure, height, y, u_dot=u_dot)
+            except TypeError:
+                # If calling the original fails, fallback to wrapper
+                return parachute.triggerfunc(pressure, height, y, sensors)
+
+        # Default: don't compute u_dot and use existing wrapper
+        return parachute.triggerfunc(pressure, height, y, sensors)
 
     def __init_solution_monitors(self):
         # Initialize solution monitors
@@ -1439,7 +1536,9 @@ class Flight:
         # Hey! We will finish this function later, now we just can use u_dot
         return self.u_dot_generalized(t, u, post_processing=post_processing)
 
-    def u_dot(self, t, u, post_processing=False):  # pylint: disable=too-many-locals,too-many-statements
+    def u_dot(
+        self, t, u, post_processing=False
+    ):  # pylint: disable=too-many-locals,too-many-statements
         """Calculates derivative of u state vector with respect to time
         when rocket is flying in 6 DOF motion during ascent out of rail
         and descent without parachute.
@@ -1759,7 +1858,9 @@ class Flight:
 
         return u_dot
 
-    def u_dot_generalized(self, t, u, post_processing=False):  # pylint: disable=too-many-locals,too-many-statements
+    def u_dot_generalized(
+        self, t, u, post_processing=False
+    ):  # pylint: disable=too-many-locals,too-many-statements
         """Calculates derivative of u state vector with respect to time when the
         rocket is flying in 6 DOF motion in space and significant mass variation
         effects exist. Typical flight phases include powered ascent after launch
@@ -3571,9 +3672,7 @@ class Flight:
             new_index = (
                 index - 1
                 if flight_phase.t < previous_phase.t
-                else index + 1
-                if flight_phase.t > next_phase.t
-                else index
+                else index + 1 if flight_phase.t > next_phase.t else index
             )
             flight_phase.t += adjust
             self.add(flight_phase, new_index)
