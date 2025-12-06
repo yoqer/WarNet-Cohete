@@ -68,7 +68,11 @@ monte-carlo = [
     "contextily>=1.0.0; python_version < '3.14'",
 ]
 
-all = ["rocketpy[env-analysis]", "rocketpy[monte-carlo]"]
+animation = [
+    "vedo>=2024.5.1"
+]
+
+all = ["rocketpy[env-analysis]", "rocketpy[monte-carlo]", "rocketpy[animation]"]
 
 
 [tool.coverage.report]
