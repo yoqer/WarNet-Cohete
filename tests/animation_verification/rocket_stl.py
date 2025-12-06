@@ -19,7 +19,6 @@ def create_rocket_stl(filename="rocket_model.stl", length=100, radius=10):
     
     # More realistic proportions
     nose_length = length * 0.25
-    body_length = length * 0.65
     engine_length = length * 0.1
     
     # Fin parameters
@@ -134,9 +133,6 @@ def create_rocket_stl(filename="rocket_model.stl", length=100, radius=10):
     for fin_num in range(num_fins):
         fin_angle = 2 * math.pi * fin_num / num_fins
         
-        # Fin vertices
-        fin_base_center = [0, 0, body_z_end * 0.5]
-        
         # Inner fin edge (attached to rocket)
         inner_x = math.cos(fin_angle) * radius
         inner_y = math.sin(fin_angle) * radius
@@ -211,10 +207,6 @@ def create_rocket_stl_simple(filename="rocket_simple.stl", length=100, radius=10
                 f.write(struct.pack('<H', 0))
     
     # Simplified geometry - create a more detailed rocket than original but simpler than full version
-    num_segments = 16
     faces = []
-    
-    # Add more triangles for better shape...
-    # (You can combine the face generation logic from above with this write_stl function)
     
     write_stl(faces, filename)
