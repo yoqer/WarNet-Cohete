@@ -1,5 +1,6 @@
 # pylint: disable=too-many-lines
 import math
+import time
 import warnings
 from copy import deepcopy
 from functools import cached_property
@@ -4175,7 +4176,202 @@ class Flight:
             color=color,
             altitude_mode=altitude_mode,
         )
+    def animate_trajectory(self, file_name, start=0, stop=None, time_step=0.1, **kwargs):
+        """
+        6-DOF Animation of the flight trajectory using Vedo.
 
+        Parameters
+        ----------
+        file_name : str
+            3D object file representing your rocket, usually in .stl format.
+            Example: "rocket.stl"
+        start : int, float, optional
+            Time for starting animation, in seconds. Default is 0.
+        stop : int, float, optional
+            Time for ending animation, in seconds. If None, uses self.t_final.
+            Default is None.
+        time_step : float, optional
+            Time step for data interpolation in the animation. Default is 0.1.
+        **kwargs : dict, optional
+            Additional keyword arguments to be passed to vedo.Plotter.show().
+            Common arguments:
+            - azimuth (float): Rotation in degrees around the vertical axis.
+            - elevation (float): Rotation in degrees above the horizon.
+            - roll (float): Rotation in degrees around the view axis.
+            - zoom (float): Zoom level (default 1).
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ImportError
+            If the 'vedo' package is not installed.
+            
+        Notes
+        -----
+        This feature requires the 'vedo' package. Install it with:
+        pip install rocketpy[animation]
+        """
+        try:
+            from vedo import Box, Line, Mesh, Plotter, settings
+        except ImportError as e:
+            raise ImportError(
+                "The animation feature requires the 'vedo' package. "
+                "Install it with:\n"
+                "    pip install rocketpy[animation]\n"
+                "Or directly:\n"
+                "    pip install vedo>=2024.5.1"
+            ) from e
+
+        # Enable interaction if needed
+        try:
+            settings.allow_interaction = True
+        except AttributeError:
+            pass  # Not available in newer versions of vedo
+
+        # Handle stop time
+        if stop is None:
+            stop = self.t_final
+
+        # Define the world bounds based on trajectory
+        max_x = max(self.x[:, 1])
+        max_y = max(self.y[:, 1])
+        # Use simple logic for bounds
+        world = Box(
+            pos=[self.x(start), self.y(start), self.apogee],
+            length=max_x * 2 if max_x != 0 else 1000,
+            width=max_y * 2 if max_y != 0 else 1000,
+            height=self.apogee,
+        ).wireframe()
+
+        # Load rocket mesh
+        rocket = Mesh(file_name).c("green")
+        rocket.pos(self.x(start), self.y(start), 0).add_trail(n=len(self.x[:, 1]))
+        # Create trail
+        trail_points = [[self.x(t), self.y(t), self.z(t) - self.env.elevation] 
+                        for t in np.arange(start, stop, time_step)]
+        trail = Line(trail_points, c="k", alpha=0.5)
+        # Setup Plotter
+        plt = Plotter(axes=1, interactive=False)
+        plt.show(world, rocket, __doc__, viewup="z", **kwargs)
+
+        # Animation Loop
+        for t in np.arange(start, stop, time_step):
+            # Calculate rotation angle and vector from quaternions
+            # Note: This simple rotation logic mimics the old branch. 
+            # Ideally, vedo handles orientation via matrix, but we stick 
+            # to the provided logic for now.
+            
+            # e0 is the scalar part of the quaternion
+            angle = np.arccos(2 * self.e0(t)**2 - 1) 
+            k = np.sin(angle / 2) if np.sin(angle / 2) != 0 else 1
+            
+            # Update position and rotation
+            # Adjusting for ground elevation
+            rocket.pos(self.x(t), self.y(t), self.z(t) - self.env.elevation)
+            rocket.rotate_x(self.e1(t) / k)
+            rocket.rotate_y(self.e2(t) / k)
+            rocket.rotate_z(self.e3(t) / k)
+            
+            # update the scene
+            plt.show(world, rocket, trail)
+
+            # slow down to make animation visible
+            start_pause = time.time()
+            while time.time() - start_pause < time_step:
+                plt.render()
+
+            if getattr(plt, 'escaped', False):
+                break
+
+        plt.interactive().close()
+        return None
+
+    def animate_rotate(self, file_name, start=0, stop=None, time_step=0.1, **kwargs):
+        """
+        Animation of rocket attitude (rotation) during the flight.
+
+        Parameters
+        ----------
+        file_name : str
+            3D object file representing your rocket, usually in .stl format.
+        start : int, float, optional
+            Time for starting animation, in seconds. Default is 0.
+        stop : int, float, optional
+            Time for ending animation, in seconds. If None, uses self.t_final.
+            Default is None.
+        time_step : float, optional
+            Time step for data interpolation. Default is 0.1.
+        **kwargs : dict, optional
+            Additional keyword arguments to be passed to vedo.Plotter.show().
+            Common arguments:
+            - azimuth (float): Rotation in degrees around the vertical axis.
+            - elevation (float): Rotation in degrees above the horizon.
+            - roll (float): Rotation in degrees around the view axis.
+            - zoom (float): Zoom level (default 1).
+            
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ImportError
+            If the 'vedo' package is not installed.
+        """
+        try:
+            from vedo import Box, Mesh, Plotter, settings
+        except ImportError as e:
+            raise ImportError(
+                "The animation feature requires the 'vedo' package. "
+                "Install it with:\n"
+                "    pip install rocketpy[animation]\n"
+            ) from e
+        
+        # Enable interaction if needed
+        try:
+            settings.allow_interaction = True
+        except AttributeError:
+            pass  # Not available in newer versions of vedo
+        
+        if stop is None:
+            stop = self.t_final
+
+        # Smaller box for rotation view
+        world = Box(
+            pos=[self.x(start), self.y(start), self.apogee],
+            length=max(self.x[:, 1]) * 0.2,
+            width=max(self.y[:, 1]) * 0.2,
+            height=self.apogee * 0.1,
+        ).wireframe()
+
+        rocket = Mesh(file_name).c("green")
+        # Initialize at origin relative to view
+        rocket.pos(self.x(start), self.y(start), 0).add_trail(n=len(self.x[:, 1]))
+
+        plt = Plotter(axes=1, interactive=False)
+        plt.show(world, rocket, __doc__, viewup="z", **kwargs)
+
+        for t in np.arange(start, stop, time_step):
+            angle = np.arccos(2 * self.e0(t)**2 - 1)
+            k = np.sin(angle / 2) if np.sin(angle / 2) != 0 else 1
+            
+            # Keep position static (relative start) to observe only rotation
+            rocket.pos(self.x(start), self.y(start), 0)
+            rocket.rotate_x(self.e1(t) / k)
+            rocket.rotate_y(self.e2(t) / k)
+            rocket.rotate_z(self.e3(t) / k)
+
+            plt.show(world, rocket)
+
+            if getattr(plt, 'escaped', False):
+                break
+
+        plt.interactive().close()
+        return None
+    
     def info(self):
         """Prints out a summary of the data available about the Flight."""
         self.prints.all()
