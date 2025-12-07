@@ -7,6 +7,145 @@ from rocketpy.tools import from_hex_decode, to_hex_encode
 from ..mathutils.function import Function
 from ..prints.parachute_prints import _ParachutePrints
 
+def detect_motor_burnout(pressure, height, state_vector, u_dot):
+    """Detect motor burnout by sudden drop in acceleration.
+
+    Returns True when vertical acceleration becomes significantly negative
+    (indicating end of propulsion phase) OR when total acceleration drops below
+    a threshold indicating coasting/free-fall has begun.
+    """
+    try:
+        if u_dot is None or len(u_dot) < 6:
+            return False
+
+        ax = float(u_dot[3])
+        ay = float(u_dot[4])
+        az = float(u_dot[5])
+
+        # Defensive checks for NaN/Inf
+        if not all(np.isfinite([ax, ay, az])):
+            return False
+
+        total_acc = np.sqrt(ax * ax + ay * ay + az * az)
+        if not np.isfinite(total_acc):
+            return False
+
+        # Additional safety: ignore spurious low-accel readings at t~0 by
+        # requiring the rocket to be above a small altitude and still ascending
+        vz = float(state_vector[5]) if len(state_vector) > 5 else 0
+        if not np.isfinite(vz):
+            return False
+
+        if height < 5.0 or vz <= 0.5:
+            return False
+
+        # Burnout detected when:
+        # 1. Vertical acceleration becomes very negative (end of thrust phase)
+        # 2. OR total acceleration drops below 2.0 m/s² (coasting detected)
+        return az < -8.0 or total_acc < 2.0
+    except (ValueError, TypeError, IndexError):
+        return False
+
+
+def detect_apogee_acceleration(pressure, height, state_vector, u_dot):
+    """Detect apogee using near-zero vertical velocity and negative vertical accel.
+
+    Apogee occurs when the rocket reaches its highest point, characterized by
+    vertical velocity approaching zero and negative (downward) acceleration.
+    """
+    try:
+        if state_vector is None or u_dot is None:
+            return False
+        if len(state_vector) < 6 or len(u_dot) < 6:
+            return False
+
+        vz = float(state_vector[5])
+        az = float(u_dot[5])
+        if not all(np.isfinite([vz, az])):
+            return False
+
+        # Slightly more permissive thresholds to avoid spurious misses
+        return abs(vz) < 1.0 and az < -0.1
+    except (ValueError, TypeError, IndexError):
+        return False
+
+
+def detect_freefall(pressure, height, state_vector, u_dot):
+    """Detect free-fall when total acceleration magnitude is low.
+
+    Free-fall is characterized by acceleration magnitude close to gravitational
+    acceleration (approximately -g in the vertical direction), or when the rocket
+    is in a ballistic coasting phase with minimal thrust or drag effects.
+    """
+    try:
+        if u_dot is None or len(u_dot) < 6:
+            return False
+
+        ax = float(u_dot[3])
+        ay = float(u_dot[4])
+        az = float(u_dot[5])
+        if not all(np.isfinite([ax, ay, az])):
+            return False
+
+        total_acc = np.sqrt(ax * ax + ay * ay + az * az)
+        if not np.isfinite(total_acc):
+            return False
+
+        # Require the rocket to be descending and above a small altitude to
+        # avoid false positives before launch.
+        vz = float(state_vector[5]) if len(state_vector) > 5 else 0
+        if not np.isfinite(vz):
+            return False
+
+        if height < 5.0 or vz >= -0.2:
+            return False
+
+        # More sensitive threshold: detect free-fall at lower acceleration
+        return total_acc < 11.5
+    except (ValueError, TypeError, IndexError):
+        return False
+
+
+def detect_liftoff(pressure, height, state_vector, u_dot):
+    """Detect liftoff by high total acceleration.
+
+    Liftoff is characterized by a sudden increase in acceleration as the motor
+    ignites and begins producing thrust.
+    """
+    try:
+        if u_dot is None or len(u_dot) < 6:
+            return False
+
+        ax = float(u_dot[3])
+        ay = float(u_dot[4])
+        az = float(u_dot[5])
+        if not all(np.isfinite([ax, ay, az])):
+            return False
+
+        total_acc = np.sqrt(ax * ax + ay * ay + az * az)
+        if not np.isfinite(total_acc):
+            return False
+
+        return total_acc > 15.0
+    except (ValueError, TypeError, IndexError):
+        return False
+
+
+def altitude_trigger_factory(target_altitude, require_descent=True):
+    """Return a trigger that deploys when altitude <= target_altitude.
+
+    If require_descent is True, also require vertical velocity negative
+    (descending) to avoid firing during ascent.
+    """
+
+    def trigger(pressure, height, state_vector, u_dot=None):
+        vz = float(state_vector[5])
+        if require_descent:
+            return (height <= target_altitude) and (vz < 0)
+        return height <= target_altitude
+
+    return trigger
+
 
 class Parachute:
     """Keeps information of the parachute, which is modeled as a hemispheroid.
@@ -222,23 +361,52 @@ class Parachute:
     def __evaluate_trigger_function(self, trigger):
         """This is used to set the triggerfunc attribute that will be used to
         interact with the Flight class.
+
+        Notes
+        -----
+        The resulting triggerfunc always has signature (p, h, y, fourth) so
+        Flight can pass either the sensors list or the u_dot (derivative)
+        depending on the runtime behaviour.
         """
         # pylint: disable=unused-argument, function-redefined
-        # The parachute is deployed by a custom function
+
+        # Helper to wrap any callable to the internal (p, h, y, fourth) API
+        def _make_wrapper(fn):
+            sig = signature(fn)
+            params = list(sig.parameters.keys())
+
+            # detect if user function expects acceleration-like argument
+            expects_udot = any(
+                name.lower() in ("u_dot", "udot", "acc", "acceleration")
+                for name in params[3:]
+            )
+
+            def wrapper(p, h, y, fourth):  # fourth can be sensors or u_dot
+                # Support both 3- and 4-arg user functions
+                num_params = len(sig.parameters)
+                if num_params == 3:
+                    return fn(p, h, y)
+                if num_params == 4:
+                    return fn(p, h, y, fourth)
+                # fallback: try calling with four args, otherwise three
+                try:
+                    return fn(p, h, y, fourth)
+                except TypeError:
+                    return fn(p, h, y)
+
+            # attach metadata so Flight can decide whether to compute u_dot
+            wrapper._expects_udot = expects_udot
+            wrapper._wrapped_fn = fn
+            return wrapper
+
+        # Callable provided by user
         if callable(trigger):
-            # work around for having added sensors to parachute triggers
-            # to avoid breaking changes
-            triggerfunc = trigger
-            sig = signature(triggerfunc)
-            if len(sig.parameters) == 3:
+            self.triggerfunc = _make_wrapper(trigger)
+            return
 
-                def triggerfunc(p, h, y, sensors):
-                    return trigger(p, h, y)
+        # Numeric altitude trigger
+        if isinstance(trigger, (int, float)):
 
-            self.triggerfunc = triggerfunc
-
-        elif isinstance(trigger, (int, float)):
-            # The parachute is deployed at a given height
             def triggerfunc(p, h, y, sensors):  # pylint: disable=unused-argument
                 # p = pressure considering parachute noise signal
                 # h = height above ground level considering parachute noise signal
@@ -246,23 +414,37 @@ class Parachute:
                 return y[5] < 0 and h < trigger
 
             self.triggerfunc = triggerfunc
+            return
 
-        elif trigger.lower() == "apogee":
-            # The parachute is deployed at apogee
+        # String: map to built-in triggers
+        if isinstance(trigger, str):
+            key = trigger.strip().lower()
+            mapping = {
+                "apogee_acc": detect_apogee_acceleration,
+                "burnout": detect_motor_burnout,
+                "freefall": detect_freefall,
+                "liftoff": detect_liftoff,
+            }
+            if key in mapping:
+                self.triggerfunc = _make_wrapper(mapping[key])
+                return
+
+        # Special case: "apogee" (legacy support)
+        if isinstance(trigger, str) and trigger.lower() == "apogee":
+
             def triggerfunc(p, h, y, sensors):  # pylint: disable=unused-argument
-                # p = pressure considering parachute noise signal
-                # h = height above ground level considering parachute noise signal
-                # y = [x, y, z, vx, vy, vz, e0, e1, e2, e3, w1, w2, w3]
                 return y[5] < 0
 
             self.triggerfunc = triggerfunc
+            return
 
-        else:
-            raise ValueError(
-                f"Unable to set the trigger function for parachute '{self.name}'. "
-                + "Trigger must be a callable, a float value or the string 'apogee'. "
-                + "See the Parachute class documentation for more information."
-            )
+        # If we reach this point, the trigger is invalid
+        raise ValueError(
+            f"Unable to set the trigger function for parachute '{self.name}'. "
+            + "Trigger must be a callable, a float value or one of the strings "
+            + "('apogee','burnout','freefall','liftoff'). "
+            + "See the Parachute class documentation for more information."
+        )
 
     def __str__(self):
         """Returns a string representation of the Parachute class.
