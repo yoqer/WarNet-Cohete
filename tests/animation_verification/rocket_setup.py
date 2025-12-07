@@ -10,6 +10,7 @@ ON_DRAG_PATH = os.path.join(DATA_DIR, "rockets/calisto/powerOnDragCurve.csv")
 AIRFOIL_PATH = os.path.join(DATA_DIR, "airfoils/NACA0012-radians.txt")
 MOTOR_PATH = os.path.join(DATA_DIR, "motors/cesaroni/Cesaroni_M1670.eng")
 
+
 def get_motor():
     """Locates the motor file and returns a configured SolidMotor object."""
     # We can now point directly to the file without searching
@@ -35,10 +36,11 @@ def get_motor():
         coordinate_system_orientation="nozzle_to_combustion_chamber",
     )
 
+
 def get_calisto_rocket():
     """Configures and returns the Calisto Rocket object."""
     motor = get_motor()
-    
+
     calisto = Rocket(
         radius=127 / 2000,
         mass=14.426,
@@ -73,10 +75,20 @@ def get_calisto_rocket():
 
     # Parachutes
     calisto.add_parachute(
-        name="Main", cd_s=10.0, trigger=800, sampling_rate=105, lag=1.5, noise=(0, 8.3, 0.5)
+        name="Main",
+        cd_s=10.0,
+        trigger=800,
+        sampling_rate=105,
+        lag=1.5,
+        noise=(0, 8.3, 0.5),
     )
     calisto.add_parachute(
-        name="Drogue", cd_s=1.0, trigger="apogee", sampling_rate=105, lag=1.5, noise=(0, 8.3, 0.5)
+        name="Drogue",
+        cd_s=1.0,
+        trigger="apogee",
+        sampling_rate=105,
+        lag=1.5,
+        noise=(0, 8.3, 0.5),
     )
-    
+
     return calisto
