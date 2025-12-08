@@ -1142,13 +1142,11 @@ class Flight:
     def _evaluate_parachute_trigger(
         self, parachute, pressure, height, y, sensors, derivative_func, t
     ):
-        """Evaluate parachute trigger, optionally computing u_dot (acceleration).
+        """Evaluate parachute trigger, passing both sensors and u_dot to wrapper.
 
         This helper preserves backward compatibility with existing trigger
-        signatures and will compute ``u_dot`` only if the prepared wrapper in
-        `Parachute` or the original trigger signature requests an acceleration
-        argument (detected by parameter name such as 'u_dot', 'udot', 'acc',
-        or 'acceleration').
+        signatures. The wrapper in Parachute always expects (p, h, y, sensors, u_dot)
+        and Flight computes u_dot only when the trigger requests it (optimization).
 
         Parameters
         ----------
@@ -1172,44 +1170,48 @@ class Flight:
         bool
             True if trigger condition met, False otherwise.
         """
-        # Prefer the wrapper metadata: check if the prepared wrapper expects u_dot
         triggerfunc = parachute.triggerfunc
-        expects_udot = getattr(triggerfunc, "_expects_udot", False)
 
-        # If the wrapper didn't advertise, inspect the original user trigger
-        if not expects_udot:
+        # Check wrapper metadata for expectations
+        expects_udot = getattr(triggerfunc, "_expects_udot", False)
+        expects_sensors = getattr(triggerfunc, "_expects_sensors", True)
+
+        # Fallback: inspect original trigger signature if metadata missing
+        if not expects_udot and not expects_sensors:
             trig_original = getattr(parachute, "trigger", None)
             if callable(trig_original):
                 try:
                     sig = inspect.signature(trig_original)
-                    params = list(sig.parameters.values())
+                    params = list(sig.parameters.keys())
                     acc_names = {"u_dot", "udot", "acc", "acceleration"}
-                    if any(p.name.lower() in acc_names for p in params):
-                        expects_udot = True
+                    expects_udot = any(p.lower() in acc_names for p in params[3:])
+                    expects_sensors = any(p.lower() == "sensors" for p in params[3:])
                 except (ValueError, TypeError):
                     expects_udot = False
+                    expects_sensors = True
 
-        # If the trigger expects acceleration, compute u_dot and inject noise
+        # Compute u_dot only if needed (performance optimization)
+        u_dot = None
         if expects_udot:
             try:
                 u_dot = np.array(derivative_func(t, y), dtype=float)
-                try:
-                    noise = np.asarray(self.acceleration_noise_function())
-                    if noise.size == 3:
-                        # u_dot layout: [vx, vy, vz, ax, ay, az, ...]
-                        u_dot[3:6] = u_dot[3:6] + noise
-                except Exception:
-                    # ignore noise errors and continue
-                    pass
-                fourth_arg = u_dot
+                # Inject accelerometer noise if configured
+                if hasattr(self, "acceleration_noise_function"):
+                    try:
+                        noise = np.asarray(self.acceleration_noise_function())
+                        if noise.size == 3:
+                            # u_dot layout: [vx, vy, vz, ax, ay, az, ...]
+                            u_dot[3:6] = u_dot[3:6] + noise
+                    except Exception:
+                        # ignore noise errors and continue
+                        pass
             except Exception:
-                # Fallback to sensors if derivative computation fails
-                fourth_arg = sensors
-        else:
-            fourth_arg = sensors
+                # If u_dot computation fails, leave as None
+                u_dot = None
 
-        # Call the prepared wrapper (it will forward args to the user's fn)
-        return triggerfunc(pressure, height, y, fourth_arg)
+        # Call the wrapper with both sensors and u_dot
+        # The wrapper will decide which args to pass to the user's function
+        return triggerfunc(pressure, height, y, sensors, u_dot)
 
     def __init_solution_monitors(self):
         # Initialize solution monitors

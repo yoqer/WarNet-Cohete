@@ -7,6 +7,7 @@ from rocketpy.tools import from_hex_decode, to_hex_encode
 from ..mathutils.function import Function
 from ..prints.parachute_prints import _ParachutePrints
 
+
 def detect_motor_burnout(pressure, height, state_vector, u_dot):
     """Detect motor burnout by sudden drop in acceleration.
 
@@ -364,13 +365,12 @@ class Parachute:
 
         Notes
         -----
-        The resulting triggerfunc always has signature (p, h, y, fourth) so
-        Flight can pass either the sensors list or the u_dot (derivative)
-        depending on the runtime behaviour.
+        The resulting triggerfunc always has signature (p, h, y, sensors, u_dot)
+        so Flight can pass both sensors and u_dot when needed.
         """
         # pylint: disable=unused-argument, function-redefined
 
-        # Helper to wrap any callable to the internal (p, h, y, fourth) API
+        # Helper to wrap any callable to the internal (p, h, y, sensors, u_dot) API
         def _make_wrapper(fn):
             sig = signature(fn)
             params = list(sig.parameters.keys())
@@ -380,22 +380,39 @@ class Parachute:
                 name.lower() in ("u_dot", "udot", "acc", "acceleration")
                 for name in params[3:]
             )
+            # detect if user function expects sensors argument
+            expects_sensors = any(name.lower() == "sensors" for name in params[3:])
 
-            def wrapper(p, h, y, fourth):  # fourth can be sensors or u_dot
-                # Support both 3- and 4-arg user functions
+            def wrapper(p, h, y, sensors, u_dot):
+                # Support 3, 4, and 5-arg user functions
                 num_params = len(sig.parameters)
                 if num_params == 3:
                     return fn(p, h, y)
                 if num_params == 4:
-                    return fn(p, h, y, fourth)
-                # fallback: try calling with four args, otherwise three
+                    # Check which 4th arg to pass
+                    fourth_param = params[3].lower()
+                    if fourth_param in ("u_dot", "udot", "acc", "acceleration"):
+                        return fn(p, h, y, u_dot)
+                    else:
+                        return fn(p, h, y, sensors)
+                if num_params >= 5:
+                    # Pass both sensors and u_dot
+                    return fn(p, h, y, sensors, u_dot)
+                # fallback: try calling with available args
                 try:
-                    return fn(p, h, y, fourth)
+                    return fn(p, h, y, sensors, u_dot)
                 except TypeError:
-                    return fn(p, h, y)
+                    try:
+                        return fn(p, h, y, u_dot)
+                    except TypeError:
+                        try:
+                            return fn(p, h, y, sensors)
+                        except TypeError:
+                            return fn(p, h, y)
 
             # attach metadata so Flight can decide whether to compute u_dot
             wrapper._expects_udot = expects_udot
+            wrapper._expects_sensors = expects_sensors
             wrapper._wrapped_fn = fn
             return wrapper
 
@@ -407,12 +424,14 @@ class Parachute:
         # Numeric altitude trigger
         if isinstance(trigger, (int, float)):
 
-            def triggerfunc(p, h, y, sensors):  # pylint: disable=unused-argument
+            def triggerfunc(p, h, y, sensors, u_dot):  # pylint: disable=unused-argument
                 # p = pressure considering parachute noise signal
                 # h = height above ground level considering parachute noise signal
                 # y = [x, y, z, vx, vy, vz, e0, e1, e2, e3, w1, w2, w3]
                 return y[5] < 0 and h < trigger
 
+            triggerfunc._expects_udot = False
+            triggerfunc._expects_sensors = True
             self.triggerfunc = triggerfunc
             return
 
@@ -432,9 +451,11 @@ class Parachute:
         # Special case: "apogee" (legacy support)
         if isinstance(trigger, str) and trigger.lower() == "apogee":
 
-            def triggerfunc(p, h, y, sensors):  # pylint: disable=unused-argument
+            def triggerfunc(p, h, y, sensors, u_dot):  # pylint: disable=unused-argument
                 return y[5] < 0
 
+            triggerfunc._expects_udot = False
+            triggerfunc._expects_sensors = True
             self.triggerfunc = triggerfunc
             return
 
