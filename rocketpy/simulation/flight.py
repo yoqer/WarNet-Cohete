@@ -1,11 +1,11 @@
 # pylint: disable=too-many-lines
+import inspect
 import math
 import warnings
 from copy import deepcopy
 from functools import cached_property
 
 import numpy as np
-import inspect
 from scipy.integrate import BDF, DOP853, LSODA, RK23, RK45, OdeSolver, Radau
 
 from rocketpy.simulation.flight_data_exporter import FlightDataExporter
@@ -1236,10 +1236,10 @@ class Flight:
                         if noise.size == 3:
                             # u_dot layout: [vx, vy, vz, ax, ay, az, ...]
                             u_dot[3:6] = u_dot[3:6] + noise
-                    except Exception:
+                    except (ValueError, TypeError):
                         # ignore noise errors and continue
                         pass
-            except Exception:
+            except (ValueError, TypeError, RuntimeError):
                 # If u_dot computation fails, leave as None
                 u_dot = None
 

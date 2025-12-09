@@ -8,7 +8,7 @@ from ..mathutils.function import Function
 from ..prints.parachute_prints import _ParachutePrints
 
 
-def detect_motor_burnout(pressure, height, state_vector, u_dot):
+def detect_motor_burnout(_pressure, height, state_vector, u_dot):
     """Detect motor burnout by sudden drop in acceleration.
 
     Returns True when vertical acceleration becomes significantly negative
@@ -48,7 +48,7 @@ def detect_motor_burnout(pressure, height, state_vector, u_dot):
         return False
 
 
-def detect_apogee_acceleration(pressure, height, state_vector, u_dot):
+def detect_apogee_acceleration(_pressure, _height, state_vector, u_dot):
     """Detect apogee using near-zero vertical velocity and negative vertical accel.
 
     Apogee occurs when the rocket reaches its highest point, characterized by
@@ -71,7 +71,7 @@ def detect_apogee_acceleration(pressure, height, state_vector, u_dot):
         return False
 
 
-def detect_freefall(pressure, height, state_vector, u_dot):
+def detect_freefall(_pressure, height, state_vector, u_dot):
     """Detect free-fall when total acceleration magnitude is low.
 
     Free-fall is characterized by acceleration magnitude close to gravitational
@@ -107,7 +107,7 @@ def detect_freefall(pressure, height, state_vector, u_dot):
         return False
 
 
-def detect_liftoff(pressure, height, state_vector, u_dot):
+def detect_liftoff(_pressure, _height, _state_vector, u_dot):
     """Detect liftoff by high total acceleration.
 
     Liftoff is characterized by a sudden increase in acceleration as the motor
@@ -139,7 +139,7 @@ def altitude_trigger_factory(target_altitude, require_descent=True):
     (descending) to avoid firing during ascent.
     """
 
-    def trigger(pressure, height, state_vector, u_dot=None):
+    def trigger(_pressure, height, state_vector, _u_dot=None):
         vz = float(state_vector[5])
         if require_descent:
             return (height <= target_altitude) and (vz < 0)
@@ -359,7 +359,7 @@ class Parachute:
 
         self.__evaluate_trigger_function(trigger)
 
-    def __evaluate_trigger_function(self, trigger):
+    def __evaluate_trigger_function(self, trigger):  # pylint: disable=too-many-statements
         """This is used to set the triggerfunc attribute that will be used to
         interact with the Flight class.
 

@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from rocketpy.simulation.flight import Flight
 from rocketpy.rocket.parachute import Parachute
@@ -7,13 +6,13 @@ from rocketpy.rocket.parachute import Parachute
 
 def test_trigger_receives_u_dot_and_noise():
     # Prepare derivative function that returns known u_dot
-    def derivative_func(t, y):
+    def derivative_func(_t, _y):
         return np.array([0, 0, 0, 1.0, 2.0, 3.0, 0, 0, 0, 0, 0, 0, 0])
 
     recorded = {}
 
     # User trigger expecting u_dot named exactly 'u_dot'
-    def user_trigger(p, h, y, u_dot):
+    def user_trigger(_p, _h, _y, u_dot):
         recorded["u_dot"] = np.array(u_dot)
         return True
 
@@ -48,12 +47,12 @@ def test_trigger_receives_u_dot_and_noise():
 
 
 def test_trigger_with_sensors_and_u_dot():
-    def derivative_func(t, y):
+    def derivative_func(_t, _y):
         return np.array([0, 0, 0, -1.0, -2.0, -3.0, 0, 0, 0, 0, 0, 0, 0])
 
     recorded = {}
 
-    def user_trigger(p, h, y, sensors, u_dot):
+    def user_trigger(_p, _h, _y, sensors, u_dot):
         recorded["sensors"] = sensors
         recorded["u_dot"] = np.array(u_dot)
         return False
@@ -86,12 +85,12 @@ def test_trigger_with_sensors_and_u_dot():
 
 def test_legacy_trigger_does_not_compute_u_dot():
     # derivative function that raises if called
-    def derivative_func(t, y):
+    def derivative_func(_t, _y):
         raise RuntimeError("derivative should not be called for legacy triggers")
 
     called = {}
 
-    def legacy_trigger(p, h, y):
+    def legacy_trigger(_p, _h, _y):
         called["ok"] = True
         return True
 
