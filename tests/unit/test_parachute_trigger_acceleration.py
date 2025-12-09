@@ -26,6 +26,7 @@ class TestTriggerSignatures:
         Verifies acceleration data is computed and noise is injected before
         passing to user trigger functions.
         """
+
         # Arrange
         def derivative_func(_t, _y):
             return np.array([0, 0, 0, 1.0, 2.0, 3.0, 0, 0, 0, 0, 0, 0, 0])
@@ -69,6 +70,7 @@ class TestTriggerSignatures:
         Verifies wrapper correctly passes both sensors and acceleration data
         to triggers expecting 5 parameters.
         """
+
         # Arrange
         def derivative_func(_t, _y):
             return np.array([0, 0, 0, -1.0, -2.0, -3.0, 0, 0, 0, 0, 0, 0, 0])
@@ -113,6 +115,7 @@ class TestTriggerSignatures:
         Ensures backward compatibility by skipping expensive derivative
         computation when not needed.
         """
+
         # Arrange
         def derivative_func(_t, _y):
             raise RuntimeError("derivative should not be called for legacy triggers")
@@ -314,6 +317,7 @@ class TestParachuteInitialization:
 
     def test_parachute_callable_trigger_5_args(self):
         """Test parachute with custom trigger expecting sensors and u_dot."""
+
         # Arrange
         def custom_trigger(_p, _h, _y, sensors, u_dot):
             return len(sensors) > 0 and u_dot[5] < -5.0
@@ -399,6 +403,7 @@ class TestEdgeCases:
 
     def test_trigger_with_no_noise_function(self):
         """Test trigger evaluation when acceleration_noise_function is None."""
+
         # Arrange
         def derivative_func(_t, _y):
             return np.array([0, 0, 0, 1.0, 2.0, 3.0, 0, 0, 0, 0, 0, 0, 0])
@@ -438,6 +443,7 @@ class TestEdgeCases:
 
     def test_trigger_derivative_computation_error(self):
         """Test trigger evaluation handles derivative computation errors gracefully."""
+
         # Arrange
         def derivative_func(_t, _y):
             raise ValueError("Derivative computation failed")
