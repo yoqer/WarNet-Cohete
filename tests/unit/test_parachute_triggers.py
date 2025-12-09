@@ -1,17 +1,18 @@
-import numpy as np
 import traceback
+
+import numpy as np
 
 from rocketpy.simulation.flight import Flight
 from rocketpy.rocket.parachute import Parachute
 
 
 def _test_trigger_receives_u_dot_and_noise():
-    def derivative_func(t, y):
+    def derivative_func(_t, _y):
         return np.array([0, 0, 0, 1.0, 2.0, 3.0, 0, 0, 0, 0, 0, 0, 0])
 
     recorded = {}
 
-    def user_trigger(p, h, y, u_dot):
+    def user_trigger(_p, _h, _y, u_dot):
         recorded["u_dot"] = np.array(u_dot)
         return True
 
@@ -44,12 +45,12 @@ def _test_trigger_receives_u_dot_and_noise():
 def _test_trigger_with_u_dot_only():
     """Test trigger that only expects u_dot (no sensors)."""
 
-    def derivative_func(t, y):
+    def derivative_func(_t, _y):
         return np.array([0, 0, 0, -1.0, -2.0, -3.0, 0, 0, 0, 0, 0, 0, 0])
 
     recorded = {}
 
-    def user_trigger(p, h, y, u_dot):
+    def user_trigger(_p, _h, _y, u_dot):
         recorded["u_dot"] = np.array(u_dot)
         return False
 
@@ -80,12 +81,12 @@ def _test_trigger_with_u_dot_only():
 
 
 def _test_legacy_trigger_does_not_compute_u_dot():
-    def derivative_func(t, y):
+    def derivative_func(_t, _y):
         raise RuntimeError("derivative should not be called for legacy triggers")
 
     called = {}
 
-    def legacy_trigger(p, h, y):
+    def legacy_trigger(_p, _h, _y):
         called["ok"] = True
         return True
 
@@ -126,7 +127,7 @@ def run_all():
         try:
             t()
             print(f"[PASS] {name}")
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             failures += 1
             print(f"[FAIL] {name}")
             traceback.print_exc()
