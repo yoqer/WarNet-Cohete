@@ -164,41 +164,56 @@ class Parachute:
         This parameter defines the trigger condition for the parachute ejection
         system. It can be one of the following:
 
-        - A callable function that takes three arguments:
-          1. Freestream pressure in pascals.
-          2. Height in meters above ground level.
-          3. The state vector of the simulation, which is defined as:
+        - A callable function that can take 3, 4, or 5 arguments:
 
-             `[x, y, z, vx, vy, vz, e0, e1, e2, e3, wx, wy, wz]`.
+          **3 arguments** (legacy):
+            1. Freestream pressure in pascals.
+            2. Height in meters above ground level.
+            3. The state vector: ``[x, y, z, vx, vy, vz, e0, e1, e2, e3, wx, wy, wz]``
 
-          4. A list of sensors that are attached to the rocket. The most recent
-             measurements of the sensors are provided with the
-             ``sensor.measurement`` attribute. The sensors are listed in the same
-             order as they are added to the rocket.
+          **4 arguments** (sensors OR acceleration):
+            1. Freestream pressure in pascals.
+            2. Height in meters above ground level.
+            3. The state vector.
+            4. Either:
+               - ``sensors``: List of sensor objects attached to the rocket, OR
+               - ``u_dot``: State derivative including accelerations at indices [3:6]
 
-          The function should return ``True`` if the parachute ejection system
-          should be triggered and False otherwise. The function will be called
-          according to the specified sampling rate.
+          **5 arguments** (sensors AND acceleration):
+            1. Freestream pressure in pascals.
+            2. Height in meters above ground level.
+            3. The state vector.
+            4. ``sensors``: List of sensor objects.
+            5. ``u_dot``: State derivative with accelerations ``[vx, vy, vz, ax, ay, az, ...]``
+
+          The function should return ``True`` to trigger deployment, ``False`` otherwise.
+          The function will be called according to the specified sampling rate.
 
         - A float value, representing an absolute height in meters. In this
           case, the parachute will be ejected when the rocket reaches this height
-          above ground level.
+          above ground level while descending.
 
-        - The string "apogee" which triggers the parachute at apogee, i.e.,
-          when the rocket reaches its highest point and starts descending.
+        - A string for built-in triggers:
+          - ``"apogee"``: Legacy apogee detection (velocity-based)
+          - ``"apogee_acc"``: Apogee detection using acceleration data
+          - ``"burnout"``: Motor burnout detection via acceleration drop
+          - ``"freefall"``: Free-fall detection via low total acceleration
+          - ``"liftoff"``: Liftoff detection via high acceleration
 
 
     Parachute.triggerfunc : function
         Trigger function created from the trigger used to evaluate the trigger
         condition for the parachute ejection system. It is a callable function
-        that takes three arguments: Freestream pressure in Pa, Height above
-        ground level in meters, and the state vector of the simulation. The
-        returns ``True`` if the parachute ejection system should be triggered
+        that takes five arguments: Freestream pressure in Pa, Height above
+        ground level in meters, the state vector, sensors list, and u_dot.
+        Returns ``True`` if the parachute ejection system should be triggered
         and ``False`` otherwise.
 
-        .. note:
+        .. note::
 
             The function will be called according to the sampling rate specified.
+            For performance, ``u_dot`` is only computed if the trigger signature
+            indicates it is needed.
 
     Parachute.sampling_rate : float
         Sampling rate, in Hz, for the trigger function.
