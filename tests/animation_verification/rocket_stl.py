@@ -1,7 +1,8 @@
 import math
+import struct
+
 import numpy as np
 from stl import mesh  # Requires numpy-stl package: pip install numpy-stl
-import struct
 
 
 def create_rocket_stl(filename="rocket_model.stl", length=100, radius=10):
