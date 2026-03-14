@@ -1,6 +1,7 @@
 import os
 
 from rocketpy import Rocket, SolidMotor
+from rocketpy import SolidMotor, Rocket
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))

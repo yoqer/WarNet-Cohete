@@ -5,6 +5,9 @@ from rocket_setup import get_calisto_rocket
 from rocket_stl import create_rocket_stl
 
 from rocketpy import Environment, Flight
+from rocketpy import Environment, Flight
+from rocket_stl import create_rocket_stl
+from rocket_setup import get_calisto_rocket
 
 
 def run_simulation_and_test_animation():

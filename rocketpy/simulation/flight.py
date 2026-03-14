@@ -717,6 +717,7 @@ class Flight:
                         self.y_sol,
                         self.solution,
                         self.sensors,
+                        self.env,
                     )
 
                 for parachute in node.parachutes:
@@ -760,11 +761,12 @@ class Flight:
                             lambda self, parachute_porosity=parachute.porosity: setattr(
                                 self, "parachute_porosity", parachute_porosity
                             ),
-                            lambda self,
-                            added_mass_coefficient=parachute.added_mass_coefficient: setattr(
-                                self,
-                                "parachute_added_mass_coefficient",
-                                added_mass_coefficient,
+                            lambda self, added_mass_coefficient=parachute.added_mass_coefficient: (
+                                setattr(
+                                    self,
+                                    "parachute_added_mass_coefficient",
+                                    added_mass_coefficient,
+                                )
                             ),
                         ]
                         self.flight_phases.add_phase(
@@ -874,6 +876,7 @@ class Flight:
                 self.y_sol,
                 self.solution,
                 self.sensors,
+                self.env,
             )
 
     def __measure_sensors(self, component_sensors, u_dot, t=None, y_sol=None):
@@ -982,11 +985,12 @@ class Flight:
                 lambda self, parachute_porosity=parachute.porosity: setattr(
                     self, "parachute_porosity", parachute_porosity
                 ),
-                lambda self,
-                added_mass_coefficient=parachute.added_mass_coefficient: setattr(
-                    self,
-                    "parachute_added_mass_coefficient",
-                    added_mass_coefficient,
+                lambda self, added_mass_coefficient=parachute.added_mass_coefficient: (
+                    setattr(
+                        self,
+                        "parachute_added_mass_coefficient",
+                        added_mass_coefficient,
+                    )
                 ),
             ]
             self.flight_phases.add_phase(
@@ -1294,6 +1298,7 @@ class Flight:
                     overshootable_node.y_sol,
                     self.solution,
                     self.sensors,
+                    self.env,
                 )
 
             # Process sensors at overshootable node
@@ -1388,11 +1393,12 @@ class Flight:
                 lambda self, parachute_porosity=parachute.porosity: setattr(
                     self, "parachute_porosity", parachute_porosity
                 ),
-                lambda self,
-                added_mass_coefficient=parachute.added_mass_coefficient: setattr(
-                    self,
-                    "parachute_added_mass_coefficient",
-                    added_mass_coefficient,
+                lambda self, added_mass_coefficient=parachute.added_mass_coefficient: (
+                    setattr(
+                        self,
+                        "parachute_added_mass_coefficient",
+                        added_mass_coefficient,
+                    )
                 ),
             ]
             self.flight_phases.add_phase(
@@ -1698,89 +1704,28 @@ class Flight:
 
         return -wind_u * np.cos(heading_rad) + wind_v * np.sin(heading_rad)
 
-    def __get_drag_coefficient(self, drag_function, mach, z, freestream_velocity_body):
-        """Calculate drag coefficient, handling both 1D and multi-dimensional functions.
-
-        Parameters
-        ----------
-        drag_function : Function
-            The drag coefficient function (power_on_drag or power_off_drag)
-        mach : float
-            Mach number
-        z : float
-            Altitude in meters
-        freestream_velocity_body : Vector or array-like
-            Freestream velocity in body frame [stream_vx_b, stream_vy_b, stream_vz_b]
-
-        Returns
-        -------
-        float
-            Drag coefficient value
-        """
-        # Early return for 1D drag functions (only mach number)
-        if not isinstance(drag_function, Function) or not getattr(
-            drag_function, "is_multidimensional", False
-        ):
-            return drag_function.get_value_opt(mach)
-
-        # Multi-dimensional drag function - calculate additional parameters
-
-        # Calculate Reynolds number: Re = rho * V * L / mu
-        # where L is characteristic length (rocket diameter)
-        rho = self.env.density.get_value_opt(z)
-        mu = self.env.dynamic_viscosity.get_value_opt(z)
-        freestream_speed = np.linalg.norm(freestream_velocity_body)
-        characteristic_length = 2 * self.rocket.radius  # Diameter
-        # Defensive: avoid division by zero or non-finite viscosity values.
-        # Use a small epsilon fallback if `mu` is zero, negative, NaN or infinite.
-        try:
-            mu_val = float(mu)
-        except (TypeError, ValueError, OverflowError):
-            # Only catch errors related to invalid numeric conversion.
-            # Avoid catching broad Exception to satisfy linters and
-            # allow other unexpected errors to surface.
-            mu_val = 0.0
-        if not np.isfinite(mu_val) or mu_val <= 0.0:
-            mu_safe = 1e-10
-        else:
-            mu_safe = mu_val
-
-        reynolds = rho * freestream_speed * characteristic_length / mu_safe
-
-        # Calculate angle of attack
-        # Angle between freestream velocity and rocket axis (z-axis in body frame)
-        # The z component of freestream velocity in body frame
-        if hasattr(freestream_velocity_body, "z"):
-            stream_vz_b = -freestream_velocity_body.z
-        else:
-            stream_vz_b = -freestream_velocity_body[2]
-
-        # Normalize and calculate angle
-        if freestream_speed > 1e-6:
-            cos_alpha = stream_vz_b / freestream_speed
-            # Clamp to [-1, 1] to avoid numerical issues
-            cos_alpha = np.clip(cos_alpha, -1.0, 1.0)
-            alpha_rad = np.arccos(cos_alpha)
-            alpha_deg = np.rad2deg(alpha_rad)
-        else:
-            alpha_deg = 0.0
-
-        # Determine which parameters to pass based on input names
-        input_names = [name.lower() for name in drag_function.__inputs__]
-        args = []
-
-        for name in input_names:
-            if "mach" in name or name == "m":
-                args.append(mach)
-            elif "reynolds" in name or name == "re":
-                args.append(reynolds)
-            elif "alpha" in name or name == "a" or "attack" in name:
-                args.append(alpha_deg)
-            else:
-                # Unknown parameter, default to mach
-                args.append(mach)
-
-        return drag_function.get_value_opt(*args)
+    def __compute_drag_7d_inputs(
+        self,
+        stream_velocity_body,
+        stream_speed,
+        stream_mach,
+        density,
+        dynamic_viscosity,
+    ):
+        """Build drag-model inputs in the 7D order used by Rocket drag functions."""
+        aerodynamic_stream_velocity = -stream_velocity_body
+        alpha = np.arctan2(
+            aerodynamic_stream_velocity[1], aerodynamic_stream_velocity[2]
+        )
+        beta = np.arctan2(
+            aerodynamic_stream_velocity[0], aerodynamic_stream_velocity[2]
+        )
+        reynolds = (
+            density * stream_speed * (2 * self.rocket.radius) / dynamic_viscosity
+            if dynamic_viscosity > 0
+            else 0
+        )
+        return alpha, beta, stream_mach, reynolds
 
     def udot_rail1(self, t, u, post_processing=False):
         """Calculates derivative of u state vector with respect to time
@@ -1812,38 +1757,28 @@ class Flight:
         total_mass_at_t = self.rocket.total_mass.get_value_opt(t)
 
         # Get freestream speed
-        free_stream_speed = (
-            (self.env.wind_velocity_x.get_value_opt(z) - vx) ** 2
-            + (self.env.wind_velocity_y.get_value_opt(z) - vy) ** 2
-            + (vz) ** 2
-        ) ** 0.5
-        free_stream_mach = free_stream_speed / self.env.speed_of_sound.get_value_opt(z)
-
-        # For rail motion, rocket is constrained - velocity mostly along z-axis in body frame
-        # Calculate velocity in body frame (simplified for rail)
-        a11 = 1 - 2 * (e2**2 + e3**2)
-        a12 = 2 * (e1 * e2 - e0 * e3)
-        a13 = 2 * (e1 * e3 + e0 * e2)
-        a21 = 2 * (e1 * e2 + e0 * e3)
-        a22 = 1 - 2 * (e1**2 + e3**2)
-        a23 = 2 * (e2 * e3 - e0 * e1)
-        a31 = 2 * (e1 * e3 - e0 * e2)
-        a32 = 2 * (e2 * e3 + e0 * e1)
-        a33 = 1 - 2 * (e1**2 + e2**2)
-
-        # Freestream velocity in body frame
-        wind_vx = self.env.wind_velocity_x.get_value_opt(z)
-        wind_vy = self.env.wind_velocity_y.get_value_opt(z)
-        stream_vx_b = a11 * (wind_vx - vx) + a21 * (wind_vy - vy) + a31 * (-vz)
-        stream_vy_b = a12 * (wind_vx - vx) + a22 * (wind_vy - vy) + a32 * (-vz)
-        stream_vz_b = a13 * (wind_vx - vx) + a23 * (wind_vy - vy) + a33 * (-vz)
-
-        drag_coeff = self.__get_drag_coefficient(
-            self.rocket.power_on_drag,
-            free_stream_mach,
-            z,
-            [stream_vx_b, stream_vy_b, stream_vz_b],
+        free_stream_velocity = Vector(
+            [
+                self.env.wind_velocity_x.get_value_opt(z) - vx,
+                self.env.wind_velocity_y.get_value_opt(z) - vy,
+                -vz,
+            ]
         )
+        free_stream_speed = abs(free_stream_velocity)
+        free_stream_mach = free_stream_speed / self.env.speed_of_sound.get_value_opt(z)
+        rho = self.env.density.get_value_opt(z)
+        stream_velocity_body = (
+            Matrix.transformation([e0, e1, e2, e3]).transpose @ free_stream_velocity
+        )
+        dynamic_viscosity = self.env.dynamic_viscosity.get_value_opt(z)
+        alpha, beta, mach, reynolds = self.__compute_drag_7d_inputs(
+            stream_velocity_body,
+            free_stream_speed,
+            free_stream_mach,
+            rho,
+            dynamic_viscosity,
+        )
+        drag_coeff = self.rocket.power_on_drag_7d(alpha, beta, mach, reynolds, 0, 0, 0)
 
         # Calculate Forces
         pressure = self.env.pressure.get_value_opt(z)
@@ -1852,7 +1787,6 @@ class Flight:
             + self.rocket.motor.pressure_thrust(pressure),
             0,
         )
-        rho = self.env.density.get_value_opt(z)
         R3 = -0.5 * rho * (free_stream_speed**2) * self.rocket.area * (drag_coeff)
 
         # Calculate Linear acceleration
@@ -2008,44 +1942,42 @@ class Flight:
         wind_velocity_x = self.env.wind_velocity_x.get_value_opt(z)
         wind_velocity_y = self.env.wind_velocity_y.get_value_opt(z)
         speed_of_sound = self.env.speed_of_sound.get_value_opt(z)
-        free_stream_speed = (
-            (wind_velocity_x - vx) ** 2 + (wind_velocity_y - vy) ** 2 + (vz) ** 2
-        ) ** 0.5
+        free_stream_velocity = Vector([wind_velocity_x - vx, wind_velocity_y - vy, -vz])
+        free_stream_speed = abs(free_stream_velocity)
         free_stream_mach = free_stream_speed / speed_of_sound
-
-        # Get rocket velocity in body frame (needed for drag calculation)
-        vx_b = a11 * vx + a21 * vy + a31 * vz
-        vy_b = a12 * vx + a22 * vy + a32 * vz
-        vz_b = a13 * vx + a23 * vy + a33 * vz
-
-        # Calculate freestream velocity in body frame
-        stream_vx_b = (
-            a11 * (wind_velocity_x - vx) + a21 * (wind_velocity_y - vy) + a31 * (-vz)
-        )
-        stream_vy_b = (
-            a12 * (wind_velocity_x - vx) + a22 * (wind_velocity_y - vy) + a32 * (-vz)
-        )
-        stream_vz_b = (
-            a13 * (wind_velocity_x - vx) + a23 * (wind_velocity_y - vy) + a33 * (-vz)
-        )
+        stream_velocity_body = Kt @ free_stream_velocity
 
         # Determine aerodynamics forces
         # Determine Drag Force
+        rho = self.env.density.get_value_opt(z)
+        dynamic_viscosity = self.env.dynamic_viscosity.get_value_opt(z)
+        alpha, beta, mach, reynolds = self.__compute_drag_7d_inputs(
+            stream_velocity_body,
+            free_stream_speed,
+            free_stream_mach,
+            rho,
+            dynamic_viscosity,
+        )
         if t < self.rocket.motor.burn_out_time:
-            drag_coeff = self.__get_drag_coefficient(
-                self.rocket.power_on_drag,
-                free_stream_mach,
-                z,
-                [stream_vx_b, stream_vy_b, stream_vz_b],
+            drag_coeff = self.rocket.power_on_drag_7d(
+                alpha,
+                beta,
+                mach,
+                reynolds,
+                omega1,
+                omega2,
+                omega3,
             )
         else:
-            drag_coeff = self.__get_drag_coefficient(
-                self.rocket.power_off_drag,
-                free_stream_mach,
-                z,
-                [stream_vx_b, stream_vy_b, stream_vz_b],
+            drag_coeff = self.rocket.power_off_drag_7d(
+                alpha,
+                beta,
+                mach,
+                reynolds,
+                omega1,
+                omega2,
+                omega3,
             )
-        rho = self.env.density.get_value_opt(z)
         R3 = -0.5 * rho * (free_stream_speed**2) * self.rocket.area * drag_coeff
         for air_brakes in self.rocket.air_brakes:
             if air_brakes.deployment_level > 0:
@@ -2066,6 +1998,10 @@ class Flight:
         # Off center moment
         M1 += self.rocket.cp_eccentricity_y * R3
         M2 -= self.rocket.cp_eccentricity_x * R3
+        # Get rocket velocity in body frame
+        vx_b = a11 * vx + a21 * vy + a31 * vz
+        vy_b = a12 * vx + a22 * vy + a32 * vz
+        vz_b = a13 * vx + a23 * vy + a33 * vz
         # Calculate lift and moment for each component of the rocket
         velocity_in_body_frame = Vector([vx_b, vy_b, vz_b])
         w = Vector([omega1, omega2, omega3])
@@ -2086,11 +2022,13 @@ class Flight:
             # Reynolds at component altitude
             # TODO: Reynolds is only used in generic surfaces. This calculation
             # should be moved to the surface class for efficiency
+            comp_density = self.env.density.get_value_opt(comp_z)
+            comp_dynamic_viscosity = self.env.dynamic_viscosity.get_value_opt(comp_z)
             comp_reynolds = (
-                self.env.density.get_value_opt(comp_z)
+                comp_density
                 * comp_stream_speed
                 * aero_surface.reference_length
-                / self.env.dynamic_viscosity.get_value_opt(comp_z)
+                / comp_dynamic_viscosity
             )
             # Forces and moments
             X, Y, Z, M, N, L = aero_surface.compute_forces_and_moments(
@@ -2284,12 +2222,25 @@ class Flight:
         free_stream_speed = abs(free_stream_velocity)
         speed_of_sound = self.env.speed_of_sound.get_value_opt(z)
         mach = free_stream_speed / speed_of_sound
+        stream_velocity_body = Kt @ free_stream_velocity
+        dynamic_viscosity = self.env.dynamic_viscosity.get_value_opt(z)
+        alpha, beta, mach, reynolds = self.__compute_drag_7d_inputs(
+            stream_velocity_body,
+            free_stream_speed,
+            mach,
+            rho,
+            dynamic_viscosity,
+        )
 
         # Drag computation
         if t < self.rocket.motor.burn_out_time:
-            cd = self.rocket.power_on_drag.get_value_opt(mach)
+            cd = self.rocket.power_on_drag_7d(
+                alpha, beta, mach, reynolds, omega1, omega2, omega3
+            )
         else:
-            cd = self.rocket.power_off_drag.get_value_opt(mach)
+            cd = self.rocket.power_off_drag_7d(
+                alpha, beta, mach, reynolds, omega1, omega2, omega3
+            )
 
         R1, R2 = 0, 0
         R3 = -0.5 * rho * free_stream_speed**2 * self.rocket.area * cd
@@ -2323,11 +2274,13 @@ class Flight:
             rel_speed = abs(rel_velocity)
             rel_mach = rel_speed / speed_of_sound
 
+            comp_density = self.env.density.get_value_opt(comp_z)
+            comp_dynamic_viscosity = self.env.dynamic_viscosity.get_value_opt(comp_z)
             reynolds = (
-                self.env.density.get_value_opt(comp_z)
+                comp_density
                 * rel_speed
                 * surface.reference_length
-                / self.env.dynamic_viscosity.get_value_opt(comp_z)
+                / comp_dynamic_viscosity
             )
 
             fx, fy, fz, *_ = surface.compute_forces_and_moments(
@@ -2512,15 +2465,19 @@ class Flight:
         wind_velocity_x = self.env.wind_velocity_x.get_value_opt(z)
         wind_velocity_y = self.env.wind_velocity_y.get_value_opt(z)
         wind_velocity = Vector([wind_velocity_x, wind_velocity_y, 0])
-        free_stream_speed = abs((wind_velocity - Vector(v)))
+        free_stream_velocity = wind_velocity - v
+        free_stream_speed = abs(free_stream_velocity)
         speed_of_sound = self.env.speed_of_sound.get_value_opt(z)
         free_stream_mach = free_stream_speed / speed_of_sound
-
-        # Get rocket velocity in body frame (needed for drag calculation)
-        velocity_in_body_frame = Kt @ v
-        # Calculate freestream velocity in body frame
-        freestream_velocity = wind_velocity - v
-        freestream_velocity_body = Kt @ freestream_velocity
+        stream_velocity_body = Kt @ free_stream_velocity
+        dynamic_viscosity = self.env.dynamic_viscosity.get_value_opt(z)
+        alpha, beta, mach, reynolds = self.__compute_drag_7d_inputs(
+            stream_velocity_body,
+            free_stream_speed,
+            free_stream_mach,
+            rho,
+            dynamic_viscosity,
+        )
 
         if self.rocket.motor.burn_start_time < t < self.rocket.motor.burn_out_time:
             pressure = self.env.pressure.get_value_opt(z)
@@ -2529,19 +2486,25 @@ class Flight:
                 + self.rocket.motor.pressure_thrust(pressure),
                 0,
             )
-            drag_coeff = self.__get_drag_coefficient(
-                self.rocket.power_on_drag,
-                free_stream_mach,
-                z,
-                freestream_velocity_body,
+            drag_coeff = self.rocket.power_on_drag_7d(
+                alpha,
+                beta,
+                mach,
+                reynolds,
+                omega1,
+                omega2,
+                omega3,
             )
         else:
             net_thrust = 0
-            drag_coeff = self.__get_drag_coefficient(
-                self.rocket.power_off_drag,
-                free_stream_mach,
-                z,
-                freestream_velocity_body,
+            drag_coeff = self.rocket.power_off_drag_7d(
+                alpha,
+                beta,
+                mach,
+                reynolds,
+                omega1,
+                omega2,
+                omega3,
             )
         R3 += -0.5 * rho * (free_stream_speed**2) * self.rocket.area * drag_coeff
         for air_brakes in self.rocket.air_brakes:
@@ -2560,6 +2523,8 @@ class Flight:
                     R3 = air_brakes_force  # Substitutes rocket drag coefficient
                 else:
                     R3 += air_brakes_force
+        # Get rocket velocity in body frame
+        velocity_in_body_frame = Kt @ v
         # Calculate lift and moment for each component of the rocket
         for aero_surface, _ in self.rocket.aerodynamic_surfaces:
             # Component cp relative to CDM in body frame
@@ -2578,11 +2543,13 @@ class Flight:
             # Reynolds at component altitude
             # TODO: Reynolds is only used in generic surfaces. This calculation
             # should be moved to the surface class for efficiency
+            comp_density = self.env.density.get_value_opt(comp_z)
+            comp_dynamic_viscosity = self.env.dynamic_viscosity.get_value_opt(comp_z)
             comp_reynolds = (
-                self.env.density.get_value_opt(comp_z)
+                comp_density
                 * comp_stream_speed
                 * aero_surface.reference_length
-                / self.env.dynamic_viscosity.get_value_opt(comp_z)
+                / comp_dynamic_viscosity
             )
             # Forces and moments
             X, Y, Z, M, N, L = aero_surface.compute_forces_and_moments(
@@ -3160,7 +3127,7 @@ class Flight:
         max_acceleration_time_index = np.argmax(
             self.acceleration[burn_out_time_index:, 1]
         )
-        return self.acceleration[max_acceleration_time_index, 0]
+        return self.acceleration[burn_out_time_index + max_acceleration_time_index, 0]
 
     @cached_property
     def max_acceleration_power_off(self):
@@ -4176,10 +4143,7 @@ class Flight:
             color=color,
             altitude_mode=altitude_mode,
         )
-
-    def animate_trajectory(
-        self, file_name, start=0, stop=None, time_step=0.1, **kwargs
-    ):
+    def animate_trajectory(self, file_name, start=0, stop=None, time_step=0.1, **kwargs):
         """
         6-DOF Animation of the flight trajectory using Vedo.
 
@@ -4211,7 +4175,6 @@ class Flight:
         ------
         ImportError
             If the 'vedo' package is not installed.
-
         Notes
         -----
         This feature requires the 'vedo' package. Install it with:
@@ -4270,7 +4233,7 @@ class Flight:
             # to the provided logic for now.
 
             # e0 is the scalar part of the quaternion
-            angle = np.arccos(2 * self.e0(t) ** 2 - 1)
+            angle = np.arccos(2 * self.e0(t)**2 - 1)
             k = np.sin(angle / 2) if np.sin(angle / 2) != 0 else 1
 
             # Update position and rotation
@@ -4280,6 +4243,7 @@ class Flight:
             rocket.rotate_y(self.e2(t) / k)
             rocket.rotate_z(self.e3(t) / k)
 
+
             # update the scene
             plt.show(world, rocket, trail)
 
@@ -4288,7 +4252,7 @@ class Flight:
             while time.time() - start_pause < time_step:
                 plt.render()
 
-            if getattr(plt, "escaped", False):
+            if getattr(plt, 'escaped', False):
                 break
 
         plt.interactive().close()
@@ -4317,6 +4281,7 @@ class Flight:
             - roll (float): Rotation in degrees around the view axis.
             - zoom (float): Zoom level (default 1).
 
+
         Returns
         -------
         None
@@ -4335,11 +4300,13 @@ class Flight:
                 "    pip install rocketpy[animation]\n"
             ) from e
 
+
         # Enable interaction if needed
         try:
             settings.allow_interaction = True
         except AttributeError:
             pass  # Not available in newer versions of vedo
+
 
         if stop is None:
             stop = self.t_final
@@ -4360,7 +4327,7 @@ class Flight:
         plt.show(world, rocket, __doc__, viewup="z", **kwargs)
 
         for t in np.arange(start, stop, time_step):
-            angle = np.arccos(2 * self.e0(t) ** 2 - 1)
+            angle = np.arccos(2 * self.e0(t)**2 - 1)
             k = np.sin(angle / 2) if np.sin(angle / 2) != 0 else 1
 
             # Keep position static (relative start) to observe only rotation
@@ -4371,12 +4338,11 @@ class Flight:
 
             plt.show(world, rocket)
 
-            if getattr(plt, "escaped", False):
+            if getattr(plt, 'escaped', False):
                 break
 
         plt.interactive().close()
         return None
-
     def info(self):
         """Prints out a summary of the data available about the Flight."""
         self.prints.all()
@@ -4787,7 +4753,6 @@ class Flight:
                     tmp_dict[time]._controllers += node._controllers
                     tmp_dict[time].callbacks += node.callbacks
                     tmp_dict[time]._component_sensors += node._component_sensors
-                    tmp_dict[time]._controllers += node._controllers
                 except KeyError:
                     # If the node does not exist, add it to the dictionary
                     tmp_dict[time] = node
