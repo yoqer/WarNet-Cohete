@@ -274,7 +274,7 @@ During the rail launch phase, RocketPy calculates reaction forces and internal b
 **Rail Button Forces (N):**
 
 - ``rail_button1_normal_force`` : Normal reaction force at upper rail button
-- ``rail_button1_shear_force`` : Shear (tangential) reaction force at upper rail button  
+- ``rail_button1_shear_force`` : Shear (tangential) reaction force at upper rail button
 - ``rail_button2_normal_force`` : Normal reaction force at lower rail button
 - ``rail_button2_shear_force`` : Shear (tangential) reaction force at lower rail button
 
@@ -282,7 +282,7 @@ During the rail launch phase, RocketPy calculates reaction forces and internal b
 
 - ``rail_button1_bending_moment`` : Time-dependent bending moment at upper rail button attachment
 - ``max_rail_button1_bending_moment`` : Maximum absolute bending moment at upper rail button
-- ``rail_button2_bending_moment`` : Time-dependent bending moment at lower rail button attachment  
+- ``rail_button2_bending_moment`` : Time-dependent bending moment at lower rail button attachment
 - ``max_rail_button2_bending_moment`` : Maximum absolute bending moment at lower rail button
 
 **Calculation Method:**
@@ -453,6 +453,51 @@ Flight Data Plots
 
     # Flight path and orientation
     flight.plots.flight_path_angle_data()
+
+3D Flight Animation
+~~~~~~~~~~~~~~~~~~~
+
+RocketPy can animate the simulated flight trajectory and attitude through the
+Flight plots layer.
+
+.. note::
+
+    Install optional animation dependencies first:
+
+    .. code-block:: bash
+
+        pip install rocketpy[animation]
+
+.. code-block:: python
+
+    # Fast start using RocketPy's built-in default STL model
+    flight.plots.animate_trajectory(
+        start=0.0,
+        stop=min(flight.t_final, 20.0),
+        time_step=0.05,
+    )
+
+    # Or provide your own STL model file
+    flight.plots.animate_trajectory(
+        file_name="rocket.stl",
+        start=0.0,
+        stop=flight.t_final,
+        time_step=0.05,
+        azimuth=45,
+        elevation=20,
+    )
+
+    # Keep rocket centered and animate only attitude changes
+    flight.plots.animate_rotate(
+        file_name="rocket.stl",
+        start=0.0,
+        stop=min(flight.t_final, 20.0),
+        time_step=0.05,
+    )
+
+Both methods validate the selected time interval and STL path before rendering.
+If ``vedo`` is not installed, RocketPy raises an informative ``ImportError``
+with installation instructions.
 
 Forces and Moments
 ~~~~~~~~~~~~~~~~~~

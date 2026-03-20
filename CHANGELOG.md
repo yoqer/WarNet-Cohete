@@ -32,6 +32,7 @@ Attention: The newest changes should be on top -->
 
 ### Added
 
+- ENH: Add 3D flight trajectory and attitude animations in Flight plots layer [#909](https://github.com/RocketPy-Team/RocketPy/pull/909)
 - ENH: Air brakes controller functions now support 8-parameter signature [#854](https://github.com/RocketPy-Team/RocketPy/pull/854)
 - TST: Add acceptance tests for 3DOF flight simulation based on Bella Lui rocket [#914] (https://github.com/RocketPy-Team/RocketPy/pull/914_
 - ENH: Add background map auto download functionality to Monte Carlo plots [#896](https://github.com/RocketPy-Team/RocketPy/pull/896)
