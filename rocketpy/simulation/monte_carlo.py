@@ -14,6 +14,7 @@ latest documentation.
 """
 
 import json
+import csv
 import os
 import traceback
 import warnings
@@ -587,6 +588,41 @@ class MonteCarlo:
         return (
             json.dumps(outputs_dict, cls=RocketPyEncoder, **self._export_config) + "\n"
         )
+
+    def export_results(self, output_filename, output_format):
+        """Converts the default Monte Carlo .txt output to .cvs or .json file
+        depending on the user's choice
+
+        Parameters
+        ----------
+        output_filename : str
+            Name of the file in which the converted data will be saved
+        output_format : str
+            Format of the output file
+
+        Returns
+        -------
+        None
+        """
+        txt_data = []
+        with open(f"{self.filename}.outputs.txt", "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                data = json.loads(line)
+                txt_data.append(data)
+
+        output_format = output_format.strip().lower()
+        if output_format == "json":
+            with open(f"{output_filename}.json", "w", encoding="utf-8") as f:
+                json.dump(txt_data, f, indent=4)
+                _SimMonitor.reprint(f"Results saved to {Path(output_filename)} as .json file")
+        elif output_format == "csv":
+            output_csv_header = txt_data[0].keys()
+            with open(f"{output_filename}.csv", "w", newline= "") as f:
+                output_writer = csv.DictWriter(f, fieldnames=output_csv_header)
+                output_writer.writeheader()
+                output_writer.writerows(txt_data)
+                _SimMonitor.reprint(f"Results saved to {Path(output_filename)} as .csv file")
 
     def __terminate_simulation(self):
         """

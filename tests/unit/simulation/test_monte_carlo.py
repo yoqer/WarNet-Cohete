@@ -1,6 +1,8 @@
 import matplotlib as plt
 import numpy as np
 import pytest
+import json
+import os
 
 from rocketpy.simulation import MonteCarlo
 
@@ -185,3 +187,31 @@ def test_estimate_confidence_interval_raises_type_error_for_invalid_statistic():
 
     with pytest.raises(TypeError):
         mc.estimate_confidence_interval("apogee", statistic="not_a_function")
+
+
+def test_monte_carlo_export_results_to_csv_and_json_files(monte_carlo_calisto, tmp_path):
+    """Checks that the export_results create .csv and .json files
+
+    Parameters
+    ----------
+    monte_carlo_calisto : MonteCarlo
+        Fixture that has the .txt files necessary for the export_results
+    """
+    try:
+        mc = monte_carlo_calisto
+        mc.filename = tmp_path / "mock_output"
+        mock_data = {"apogee": 100, "max_velocity": 255}
+        with open(tmp_path / "mock_output.outputs.txt", "w") as f:
+            f.write(json.dumps(mock_data) + "\n")
+
+        mc.export_results(tmp_path / "mock_outputs_in_csv", "csv")
+        expected_file_in_csv = tmp_path / f"{"mock_outputs_in_csv"}.csv"
+        assert expected_file_in_csv.exists()
+
+        mc.export_results(tmp_path / "mock_output_in_json", "json")
+        expected_file_in_json = tmp_path / f"{"mock_output_in_json"}.json"
+        assert expected_file_in_json.exists()
+    finally:
+        os.remove("monte_carlo_test.errors.txt")
+        os.remove("monte_carlo_test.inputs.txt")
+        os.remove("monte_carlo_test.outputs.txt")
