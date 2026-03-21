@@ -3614,8 +3614,8 @@ class Flight:
     def stability_margin(self):
         """Stability margin of the rocket along the flight, it considers the
         variation of the center of pressure position according to the mach
-        number, as well as the variation of the center of gravity position
-        according to the propellant mass evolution.
+        number and angle of attack, as well as the variation of the center of
+        gravity position according to the propellant mass evolution.
 
         Parameters
         ----------
@@ -3627,8 +3627,27 @@ class Flight:
             Stability margin as a rocketpy.Function of time. The stability margin
             is defined as the distance between the center of pressure and the
             center of gravity, divided by the rocket diameter.
+
+        Notes
+        -----
+        The center of pressure position is computed using the actual lift
+        coefficient CN(α) instead of the lift coefficient derivative CNα. This
+        provides a more accurate stability margin that varies with angle of
+        attack, similar to OpenRocket's implementation.
         """
-        return [(t, self.rocket.stability_margin(m, t)) for t, m in self.mach_number]
+        aoa_values = self.angle_of_attack.y_array
+        mach_values = self.mach_number.y_array
+        time_values = self.time
+
+        results = []
+        for i, t in enumerate(time_values):
+            # Convert angle of attack from degrees to radians
+            alpha_rad = np.deg2rad(aoa_values[i])
+            mach = mach_values[i]
+            sm = self.rocket.get_stability_margin_from_alpha(alpha_rad, mach, t)
+            results.append((t, sm))
+
+        return results
 
     # Rail Button Forces
 

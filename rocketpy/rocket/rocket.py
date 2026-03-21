@@ -697,6 +697,91 @@ class Rocket:
         )
         return self.stability_margin
 
+    def get_cp_position_from_alpha(self, alpha, mach):
+        """Computes the center of pressure position as a function of the angle
+        of attack and Mach number. This method uses the actual lift coefficient
+        CN(α) instead of the lift coefficient derivative CNα, providing a more
+        accurate CP position that varies with angle of attack.
+
+        Parameters
+        ----------
+        alpha : float
+            Angle of attack in radians.
+        mach : float
+            Mach number.
+
+        Returns
+        -------
+        float
+            Center of pressure position relative to the user-defined rocket
+            reference system, in meters.
+
+        Notes
+        -----
+        The center of pressure is calculated as:
+            CP = Σ(CN(α) × X_cp) / Σ(CN(α))
+        where CN(α) is the lift coefficient as a function of angle of attack
+        and X_cp is the center of pressure position of each aerodynamic surface.
+        """
+        # Threshold for numerical zero checks
+        epsilon = 1e-10
+
+        # Handle edge case where alpha is effectively zero
+        if abs(alpha) < epsilon:
+            return self.cp_position.get_value_opt(mach)
+
+        total_cn = 0.0
+        weighted_cp = 0.0
+
+        for aero_surface, position in self.aerodynamic_surfaces:
+            if isinstance(aero_surface, GenericSurface):
+                continue
+
+            ref_factor = (aero_surface.rocket_radius / self.radius) ** 2
+            cn = ref_factor * aero_surface.cl.get_value_opt(alpha, mach)
+            surface_cp = position.z - self._csys * aero_surface.cpz
+
+            total_cn += cn
+            weighted_cp += cn * surface_cp
+
+        if abs(total_cn) < epsilon:
+            return self.cp_position.get_value_opt(mach)
+
+        return weighted_cp / total_cn
+
+    def get_stability_margin_from_alpha(self, alpha, mach, time):
+        """Computes the stability margin using the angle of attack-dependent
+        center of pressure position.
+
+        Parameters
+        ----------
+        alpha : float
+            Angle of attack in radians.
+        mach : float
+            Mach number.
+        time : float
+            Time in seconds.
+
+        Returns
+        -------
+        float
+            Stability margin in calibers. A positive value indicates the rocket
+            is stable (center of pressure is behind the center of mass).
+
+        Notes
+        -----
+        The stability margin is calculated as:
+            SM = (CG - CP(α)) / d
+        where CG is the center of gravity, CP(α) is the angle of attack-dependent
+        center of pressure, and d is the rocket diameter.
+        """
+        cp_position = self.get_cp_position_from_alpha(alpha, mach)
+        return (
+            (self.center_of_mass.get_value_opt(time) - cp_position)
+            / (2 * self.radius)
+            * self._csys
+        )
+
     def evaluate_static_margin(self):
         """Calculates the static margin of the rocket as a function of time.
 

@@ -166,6 +166,67 @@ def test_out_of_rail_stability_margin(flight_calisto_custom_wind):
     assert np.isclose(res, 2.14, atol=0.1)
 
 
+def test_stability_margin_uses_angle_of_attack(flight_calisto_custom_wind):
+    """Test that the stability margin calculation accounts for angle of attack.
+
+    The stability margin should use the actual lift coefficient CN(α) instead of
+    just the lift coefficient derivative CNα. This provides a more accurate
+    stability margin that varies with angle of attack.
+
+    Parameters
+    ----------
+    flight_calisto_custom_wind : rocketpy.Flight
+    """
+    # Get stability margin at various times
+    stability_array = flight_calisto_custom_wind.stability_margin[:, 1]
+    time_array = flight_calisto_custom_wind.stability_margin[:, 0]
+
+    # Verify stability margin is a reasonable Function
+    assert len(stability_array) == len(time_array)
+    assert len(stability_array) > 0
+
+    # Verify the rocket's get_stability_margin_from_alpha method works
+    rocket = flight_calisto_custom_wind.rocket
+    alpha = np.deg2rad(5)  # 5 degrees angle of attack
+    mach = 0.5
+    time = 0.0
+
+    sm_from_alpha = rocket.get_stability_margin_from_alpha(alpha, mach, time)
+    sm_from_mach = rocket.stability_margin(mach, time)
+
+    # Both should return reasonable stability margins (positive for stable rocket)
+    assert isinstance(sm_from_alpha, float)
+    assert isinstance(sm_from_mach, float)
+    assert sm_from_alpha > 0  # Should be stable
+    assert sm_from_mach > 0  # Should be stable
+
+
+def test_cp_position_from_alpha_edge_cases(flight_calisto_custom_wind):
+    """Test edge cases for the get_cp_position_from_alpha method.
+
+    Parameters
+    ----------
+    flight_calisto_custom_wind : rocketpy.Flight
+    """
+    rocket = flight_calisto_custom_wind.rocket
+    mach = 0.5
+
+    # Test with zero angle of attack - should fall back to standard cp_position
+    cp_zero_alpha = rocket.get_cp_position_from_alpha(0.0, mach)
+    cp_standard = rocket.cp_position.get_value_opt(mach)
+    assert np.isclose(cp_zero_alpha, cp_standard)
+
+    # Test with small positive angle of attack
+    alpha_small = np.deg2rad(1)
+    cp_small = rocket.get_cp_position_from_alpha(alpha_small, mach)
+    assert isinstance(cp_small, float)
+
+    # Test with larger angle of attack
+    alpha_large = np.deg2rad(10)
+    cp_large = rocket.get_cp_position_from_alpha(alpha_large, mach)
+    assert isinstance(cp_large, float)
+
+
 def test_export_sensor_data(flight_calisto_with_sensors):
     """Test the export of sensor data.
 
