@@ -1,5 +1,4 @@
 # pylint: disable=too-many-lines
-import inspect
 import math
 import warnings
 from copy import deepcopy
@@ -97,12 +96,6 @@ class Flight:
         trigger function evaluation points and then interpolation is used to
         calculate them and feed the triggers. Can greatly improve run
         time in some cases.
-    Note
-    ----
-    Calculating the derivative `u_dot` inside parachute trigger checks will
-    cause additional calls to the equations of motion (extra physics
-    evaluations). This increases CPU cost but enables realistic avionics
-    algorithms that rely on accelerometer data.
     Flight.terminate_on_apogee : bool
         Whether to terminate simulation when rocket reaches apogee.
     Flight.solver : scipy.integrate.LSODA
@@ -510,7 +503,6 @@ class Flight:
         name="Flight",
         equations_of_motion="standard",
         ode_solver="LSODA",
-        acceleration_noise_function=None,
         simulation_mode="6 DOF",
         weathercock_coeff=0.0,
     ):
@@ -596,6 +588,9 @@ class Flight:
             A custom ``scipy.integrate.OdeSolver`` can be passed as well.
             For more information on the integration methods, see the scipy
             documentation [1]_.
+        simulation_mode : str, optional
+            Simulation mode to use. Can be "6 DOF" for 6 degrees of freedom or
+            "3 DOF" for 3 degrees of freedom. Default is "6 DOF".
         weathercock_coeff : float, optional
             Proportionality coefficient (rate coefficient) for the alignment rate of the rocket's body axis
             with the relative wind direction in 3-DOF simulations, in rad/s. The actual angular velocity
@@ -635,13 +630,6 @@ class Flight:
         self.equations_of_motion = equations_of_motion
         self.simulation_mode = simulation_mode
         self.ode_solver = ode_solver
-        # Function that returns accelerometer noise vector [ax_noise, ay_noise, az_noise]
-        # It should be a callable that returns an array-like of length 3.
-        self.acceleration_noise_function = (
-            acceleration_noise_function
-            if acceleration_noise_function is not None
-            else (lambda: np.zeros(3))
-        )
         self.weathercock_coeff = weathercock_coeff
 
         # Controller initialization
@@ -777,8 +765,7 @@ class Flight:
                             lambda self, parachute_porosity=parachute.porosity: setattr(
                                 self, "parachute_porosity", parachute_porosity
                             ),
-                            lambda self,
-                            added_mass_coefficient=parachute.added_mass_coefficient: setattr(
+                            lambda self, added_mass_coefficient=parachute.added_mass_coefficient: setattr(
                                 self,
                                 "parachute_added_mass_coefficient",
                                 added_mass_coefficient,
@@ -959,12 +946,14 @@ class Flight:
             ) = self.__calculate_and_save_pressure_signals(
                 parachute, node.t, self.y_sol[2]
             )
-            if not parachute.triggerfunc(
+            if not self._evaluate_parachute_trigger(
+                parachute,
                 noisy_pressure,
                 height_above_ground_level,
                 self.y_sol,
                 self.sensors,
-                None,  # u_dot not computed in non-overshoot path
+                phase.derivative,
+                node.t,
             ):
                 continue  # Check next parachute
 
@@ -1000,8 +989,7 @@ class Flight:
                 lambda self, parachute_porosity=parachute.porosity: setattr(
                     self, "parachute_porosity", parachute_porosity
                 ),
-                lambda self,
-                added_mass_coefficient=parachute.added_mass_coefficient: setattr(
+                lambda self, added_mass_coefficient=parachute.added_mass_coefficient: setattr(
                     self,
                     "parachute_added_mass_coefficient",
                     added_mass_coefficient,
@@ -1369,12 +1357,14 @@ class Flight:
             )
 
             # Check for parachute trigger
-            if not parachute.triggerfunc(
+            if not self._evaluate_parachute_trigger(
+                parachute,
                 noisy_pressure,
                 height_above_ground_level,
                 overshootable_node.y_sol,
                 self.sensors,
-                None,  # u_dot not computed in overshoot path
+                phase.derivative,
+                overshootable_node.t,
             ):
                 continue  # Check next parachute
 
@@ -1407,8 +1397,7 @@ class Flight:
                 lambda self, parachute_porosity=parachute.porosity: setattr(
                     self, "parachute_porosity", parachute_porosity
                 ),
-                lambda self,
-                added_mass_coefficient=parachute.added_mass_coefficient: setattr(
+                lambda self, added_mass_coefficient=parachute.added_mass_coefficient: setattr(
                     self,
                     "parachute_added_mass_coefficient",
                     added_mass_coefficient,
@@ -1509,40 +1498,11 @@ class Flight:
 
         # Check wrapper metadata for expectations
         expects_udot = getattr(triggerfunc, "_expects_udot", False)
-        expects_sensors = getattr(triggerfunc, "_expects_sensors", True)
-
-        # Fallback: inspect original trigger signature if metadata missing
-        if not expects_udot and not expects_sensors:
-            trig_original = getattr(parachute, "trigger", None)
-            if callable(trig_original):
-                try:
-                    sig = inspect.signature(trig_original)
-                    params = list(sig.parameters.keys())
-                    acc_names = {"u_dot", "udot", "acc", "acceleration"}
-                    expects_udot = any(p.lower() in acc_names for p in params[3:])
-                    expects_sensors = any(p.lower() == "sensors" for p in params[3:])
-                except (ValueError, TypeError):
-                    expects_udot = False
-                    expects_sensors = True
 
         # Compute u_dot only if needed (performance optimization)
         u_dot = None
         if expects_udot:
-            try:
-                u_dot = np.array(derivative_func(t, y), dtype=float)
-                # Inject accelerometer noise if configured
-                if hasattr(self, "acceleration_noise_function"):
-                    try:
-                        noise = np.asarray(self.acceleration_noise_function())
-                        if noise.size == 3:
-                            # u_dot layout: [vx, vy, vz, ax, ay, az, ...]
-                            u_dot[3:6] = u_dot[3:6] + noise
-                    except (ValueError, TypeError):
-                        # ignore noise errors and continue
-                        pass
-            except (ValueError, TypeError, RuntimeError):
-                # If u_dot computation fails, leave as None
-                u_dot = None
+            u_dot = derivative_func(t, y)
 
         # Call the wrapper with both sensors and u_dot
         # The wrapper will decide which args to pass to the user's function
@@ -1991,7 +1951,9 @@ class Flight:
         # Hey! We will finish this function later, now we just can use u_dot
         return self.u_dot_generalized(t, u, post_processing=post_processing)
 
-    def u_dot(self, t, u, post_processing=False):  # pylint: disable=too-many-locals,too-many-statements
+    def u_dot(
+        self, t, u, post_processing=False
+    ):  # pylint: disable=too-many-locals,too-many-statements
         """Calculates derivative of u state vector with respect to time
         when rocket is flying in 6 DOF motion during ascent out of rail
         and descent without parachute.
@@ -2537,7 +2499,9 @@ class Flight:
 
         return u_dot
 
-    def u_dot_generalized(self, t, u, post_processing=False):  # pylint: disable=too-many-locals,too-many-statements
+    def u_dot_generalized(
+        self, t, u, post_processing=False
+    ):  # pylint: disable=too-many-locals,too-many-statements
         """Calculates derivative of u state vector with respect to time when the
         rocket is flying in 6 DOF motion in space and significant mass variation
         effects exist. Typical flight phases include powered ascent after launch
@@ -4372,9 +4336,7 @@ class Flight:
             new_index = (
                 index - 1
                 if flight_phase.t < previous_phase.t
-                else index + 1
-                if flight_phase.t > next_phase.t
-                else index
+                else index + 1 if flight_phase.t > next_phase.t else index
             )
             flight_phase.t += adjust
             self.add(flight_phase, new_index)

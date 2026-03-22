@@ -1,12 +1,10 @@
-import traceback
-
 import numpy as np
 
-from rocketpy.simulation.flight import Flight
 from rocketpy.rocket.parachute import Parachute
+from rocketpy.simulation.flight import Flight
 
 
-def _test_trigger_receives_u_dot_and_noise():
+def test_trigger_receives_u_dot():
     def derivative_func(_t, _y):
         return np.array([0, 0, 0, 1.0, 2.0, 3.0, 0, 0, 0, 0, 0, 0, 0])
 
@@ -24,7 +22,6 @@ def _test_trigger_receives_u_dot_and_noise():
     )
 
     dummy = type("D", (), {})()
-    dummy.acceleration_noise_function = lambda: np.array([0.1, -0.2, 0.3])
 
     res = Flight._evaluate_parachute_trigger(
         dummy,
@@ -39,10 +36,10 @@ def _test_trigger_receives_u_dot_and_noise():
 
     assert res is True
     assert "u_dot" in recorded
-    assert np.allclose(recorded["u_dot"][3:6], np.array([1.1, 1.8, 3.3]))
+    assert np.allclose(recorded["u_dot"][3:6], np.array([1.0, 2.0, 3.0]))
 
 
-def _test_trigger_with_u_dot_only():
+def test_trigger_with_u_dot_only():
     """Test trigger that only expects u_dot (no sensors)."""
 
     def derivative_func(_t, _y):
@@ -62,7 +59,6 @@ def _test_trigger_with_u_dot_only():
     )
 
     dummy = type("D", (), {})()
-    dummy.acceleration_noise_function = lambda: np.array([0.0, 0.0, 0.0])
 
     res = Flight._evaluate_parachute_trigger(
         dummy,
@@ -80,7 +76,7 @@ def _test_trigger_with_u_dot_only():
     assert np.allclose(recorded["u_dot"][3:6], np.array([-1.0, -2.0, -3.0]))
 
 
-def _test_legacy_trigger_does_not_compute_u_dot():
+def test_legacy_trigger_does_not_compute_u_dot():
     def derivative_func(_t, _y):
         raise RuntimeError("derivative should not be called for legacy triggers")
 
@@ -98,7 +94,6 @@ def _test_legacy_trigger_does_not_compute_u_dot():
     )
 
     dummy = type("D", (), {})()
-    dummy.acceleration_noise_function = lambda: np.zeros(3)
 
     res = Flight._evaluate_parachute_trigger(
         dummy,
@@ -113,29 +108,3 @@ def _test_legacy_trigger_does_not_compute_u_dot():
 
     assert res is True
     assert called.get("ok", False) is True
-
-
-def run_all():
-    tests = [
-        _test_trigger_receives_u_dot_and_noise,
-        _test_trigger_with_u_dot_only,
-        _test_legacy_trigger_does_not_compute_u_dot,
-    ]
-    failures = 0
-    for t in tests:
-        name = t.__name__
-        try:
-            t()
-            print(f"[PASS] {name}")
-        except Exception:  # pylint: disable=broad-exception-caught
-            failures += 1
-            print(f"[FAIL] {name}")
-            traceback.print_exc()
-    if failures:
-        print(f"{failures} test(s) failed")
-        raise SystemExit(1)
-    print("All tests passed")
-
-
-if __name__ == "__main__":
-    run_all()

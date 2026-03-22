@@ -11,7 +11,7 @@ Overview
 Traditional parachute triggers rely on altitude and velocity. Acceleration-based
 triggers provide additional capabilities:
 
-- **Motor burnout detection**: Detect thrust termination via sudden deceleration
+- **Motor burnout detection**: Implement as a custom trigger with mission-specific thresholds
 - **Apogee detection**: Use acceleration and velocity together for precise apogee
 - **Freefall detection**: Identify ballistic coasting phases
 - **Liftoff detection**: Confirm motor ignition via high acceleration
@@ -19,97 +19,106 @@ triggers provide additional capabilities:
 These triggers can optionally include sensor noise to simulate realistic IMU
 behavior, making simulations more representative of actual flight conditions.
 
-Built-in Triggers
------------------
+Built-in Trigger
+----------------
 
-RocketPy provides four built-in acceleration-based triggers:
-
-Motor Burnout Detection
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Detects when the motor stops producing thrust by monitoring sudden drops in
-acceleration magnitude.
-
-.. code-block:: python
-
-    from rocketpy import Parachute
-
-    drogue = Parachute(
-        name="Drogue",
-        cd_s=1.0,
-        trigger="burnout",  # Built-in trigger
-        sampling_rate=100,
-        lag=1.5
-    )
-
-**Detection criteria:**
-- Vertical acceleration < -8.0 m/s² (end of thrust phase), OR
-- Total acceleration magnitude < 2.0 m/s² (coasting detected)
-- Rocket must be above 5m altitude and ascending (prevents false triggers at launch)
+RocketPy provides one built-in trigger string:
 
 Apogee Detection
 ~~~~~~~~~~~~~~~~
 
-Detects apogee using both near-zero vertical velocity and negative vertical
-acceleration.
+Detects apogee when the rocket starts descending.
 
 .. code-block:: python
 
     main = Parachute(
         name="Main",
         cd_s=10.0,
-        trigger="apogee_acc",  # Acceleration-based apogee
+        trigger="apogee",
         sampling_rate=100,
         lag=0.5
     )
 
 **Detection criteria:**
-- Absolute vertical velocity < 1.0 m/s
-- Vertical acceleration < -0.1 m/s² (downward)
-
-Freefall Detection
-~~~~~~~~~~~~~~~~~~
-
-Detects free-fall by monitoring very low total acceleration (near gravitational
-acceleration only).
-
-.. code-block:: python
-
-    drogue = Parachute(
-        name="Drogue",
-        cd_s=1.0,
-        trigger="freefall",
-        sampling_rate=100,
-        lag=1.0
-    )
-
-**Detection criteria:**
-- Total acceleration magnitude < 11.5 m/s²
-- Rocket descending (vz < -0.2 m/s)
-- Altitude > 5m (prevents ground-level false triggers)
-
-Liftoff Detection
-~~~~~~~~~~~~~~~~~
-
-Detects motor ignition via high total acceleration.
-
-.. code-block:: python
-
-    test_parachute = Parachute(
-        name="Test",
-        cd_s=0.5,
-        trigger="liftoff",
-        sampling_rate=100,
-        lag=0.0
-    )
-
-**Detection criteria:**
-- Total acceleration magnitude > 15.0 m/s²
+- Vertical velocity becomes negative (descent starts)
 
 Custom Triggers
 ---------------
 
 You can create custom triggers that use acceleration data:
+
+Motor Burnout Trigger (Custom Example)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Motor burnout is highly mission-dependent, so it is recommended as a custom
+trigger with user-defined thresholds:
+
+.. code-block:: python
+
+    def burnout_trigger_factory(
+        min_height=5.0,
+        min_vz=0.5,
+        az_threshold=-8.0,
+        total_acc_threshold=2.0,
+    ):
+        def burnout_trigger(_pressure, height, state_vector, u_dot):
+            if u_dot is None or len(u_dot) < 6:
+                return False
+
+            ax, ay, az = u_dot[3], u_dot[4], u_dot[5]
+            total_acc = (ax**2 + ay**2 + az**2) ** 0.5
+            vz = state_vector[5] if len(state_vector) > 5 else 0
+
+            if height < min_height or vz <= min_vz:
+                return False
+
+            return az < az_threshold or total_acc < total_acc_threshold
+
+        return burnout_trigger
+
+    drogue = Parachute(
+        name="Drogue",
+        cd_s=1.0,
+        trigger=burnout_trigger_factory(
+            min_height=10.0,
+            min_vz=2.0,
+            az_threshold=-10.0,
+            total_acc_threshold=3.0,
+        ),
+        sampling_rate=100,
+        lag=1.5,
+    )
+
+Apogee by Acceleration (Custom Example)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    def apogee_acc_trigger(_pressure, _height, state_vector, u_dot):
+        vz = state_vector[5]
+        az = u_dot[5]
+        return abs(vz) < 1.0 and az < -0.1
+
+Free-fall (Custom Example)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    def freefall_trigger(_pressure, height, state_vector, u_dot):
+        ax, ay, az = u_dot[3], u_dot[4], u_dot[5]
+        total_acc = (ax**2 + ay**2 + az**2) ** 0.5
+        vz = state_vector[5]
+        return height > 5.0 and vz < -0.2 and total_acc < 11.5
+
+Liftoff by Acceleration (Custom Example)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    def liftoff_trigger(_pressure, _height, _state_vector, u_dot):
+        ax, ay, az = u_dot[3], u_dot[4], u_dot[5]
+        total_acc = (ax**2 + ay**2 + az**2) ** 0.5
+        return total_acc > 15.0
 
 .. code-block:: python
 
@@ -181,6 +190,9 @@ Triggers can also accept sensor data alongside acceleration:
         if len(sensors) > 0:
             imu_reading = sensors[0].measurement
 
+        # Define threshold for IMU reading (example value)
+        threshold = 100.0  # Adjust based on sensor units and trigger criteria
+
         # Use acceleration data
         az = u_dot[5]
 
@@ -194,52 +206,12 @@ Triggers can also accept sensor data alongside acceleration:
         sampling_rate=100
     )
 
-Adding Acceleration Noise
---------------------------
+Sensor Noise
+------------
 
-To simulate realistic IMU behavior, you can add noise to acceleration data:
-
-.. code-block:: python
-
-    from rocketpy import Flight
-
-    flight = Flight(
-        rocket=my_rocket,
-        environment=env,
-        rail_length=5.2,
-        inclination=85,
-        heading=0,
-        acceleration_noise_function=lambda: np.random.normal(0, 0.5, 3)
-    )
-
-The ``acceleration_noise_function`` returns a 3-element array ``[noise_x, noise_y, noise_z]``
-that is added to the acceleration components before passing to the trigger function.
-
-**Example with time-correlated noise:**
-
-.. code-block:: python
-
-    class NoiseGenerator:
-        def __init__(self, stddev=0.5, correlation=0.9):
-            self.stddev = stddev
-            self.correlation = correlation
-            self.last_noise = np.zeros(3)
-
-        def __call__(self):
-            # Time-correlated noise (AR(1) process)
-            white_noise = np.random.normal(0, self.stddev, 3)
-            self.last_noise = (self.correlation * self.last_noise +
-                               np.sqrt(1 - self.correlation**2) * white_noise)
-            return self.last_noise
-
-    flight = Flight(
-        rocket=my_rocket,
-        environment=env,
-        rail_length=5.2,
-        inclination=85,
-        heading=0,
-        acceleration_noise_function=NoiseGenerator(stddev=0.3, correlation=0.95)
-    )
+For realistic IMU behavior, use RocketPy sensors with their own noise models.
+Parachute trigger functions can receive ``sensors`` and use those measurements
+directly instead of injecting noise in the flight solver.
 
 Performance Considerations
 --------------------------
@@ -264,7 +236,7 @@ Best Practices
 1. **Choose appropriate sampling rates**: 50-200 Hz is typical for flight computers
 2. **Add realistic noise**: Real IMUs have noise; simulate it for validation
 3. **Test edge cases**: Verify triggers work at low altitudes, high speeds, etc.
-4. **Use built-in triggers**: They handle edge cases (NaN, Inf) automatically
+4. **Use robust custom logic**: Add mission-specific guards and thresholds
 5. **Document custom triggers**: Include detection criteria in docstrings
 
 Example: Complete Dual-Deploy System
@@ -281,11 +253,18 @@ Example: Complete Dual-Deploy System
 
     my_rocket = Rocket(...)  # Define your rocket
 
-    # Drogue parachute: Deploy at motor burnout
+    # Drogue parachute: Deploy using a custom burnout trigger
+    def drogue_burnout_trigger(_pressure, height, state_vector, u_dot):
+        if u_dot is None or len(u_dot) < 6:
+            return False
+        az = u_dot[5]
+        vz = state_vector[5] if len(state_vector) > 5 else 0
+        return height > 10 and vz > 1 and az < -8.0
+
     drogue = Parachute(
         name="Drogue",
         cd_s=1.0,
-        trigger="burnout",
+        trigger=drogue_burnout_trigger,
         sampling_rate=100,
         lag=1.5,
         noise=(0, 8.3, 0.5)  # Pressure sensor noise
@@ -309,14 +288,13 @@ Example: Complete Dual-Deploy System
     )
     my_rocket.add_parachute(main)
 
-    # Flight with IMU noise simulation
+    # Flight simulation
     flight = Flight(
         rocket=my_rocket,
         environment=env,
         rail_length=5.2,
         inclination=85,
         heading=0,
-        acceleration_noise_function=lambda: np.random.normal(0, 0.3, 3)
     )
 
     flight.all_info()
