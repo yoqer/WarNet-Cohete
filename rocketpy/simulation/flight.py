@@ -587,6 +587,19 @@ class Flight:
             A custom ``scipy.integrate.OdeSolver`` can be passed as well.
             For more information on the integration methods, see the scipy
             documentation [1]_.
+        simulation_mode : str, optional
+            Simulation mode to use. Can be "6 DOF" for 6 degrees of freedom or
+            "3 DOF" for 3 degrees of freedom. Default is "6 DOF".
+        weathercock_coeff : float, optional
+            Proportionality coefficient (rate coefficient) for the alignment rate of the rocket's body axis
+            with the relative wind direction in 3-DOF simulations, in rad/s. The actual angular velocity
+            applied to align the rocket is calculated as ``weathercock_coeff * sin(angle)``, where ``angle``
+            is the angle between the rocket's axis and the wind direction. A higher value means faster alignment
+            (quasi-static weathercocking). This parameter is only used when simulation_mode is '3 DOF'.
+            Default is 0.0 to mimic a pure 3-DOF simulation without any weathercocking (fixed attitude).
+            Set to a positive value to enable quasi-static weathercocking behaviour.
+
+
         Returns
         -------
         None
@@ -715,11 +728,14 @@ class Flight:
                     ) = self.__calculate_and_save_pressure_signals(
                         parachute, node.t, self.y_sol[2]
                     )
-                    if parachute.triggerfunc(
+                    if self._evaluate_parachute_trigger(
+                        parachute,
                         noisy_pressure,
                         height_above_ground_level,
                         self.y_sol,
                         self.sensors,
+                        phase.derivative,
+                        self.t,
                     ):
                         # Remove parachute from flight parachutes
                         self.parachutes.remove(parachute)
@@ -932,11 +948,14 @@ class Flight:
             ) = self.__calculate_and_save_pressure_signals(
                 parachute, node.t, self.y_sol[2]
             )
-            if not parachute.triggerfunc(
+            if not self._evaluate_parachute_trigger(
+                parachute,
                 noisy_pressure,
                 height_above_ground_level,
                 self.y_sol,
                 self.sensors,
+                phase.derivative,
+                node.t,
             ):
                 continue  # Check next parachute
 
@@ -1343,11 +1362,14 @@ class Flight:
             )
 
             # Check for parachute trigger
-            if not parachute.triggerfunc(
+            if not self._evaluate_parachute_trigger(
+                parachute,
                 noisy_pressure,
                 height_above_ground_level,
                 overshootable_node.y_sol,
                 self.sensors,
+                phase.derivative,
+                overshootable_node.t,
             ):
                 continue  # Check next parachute
 
@@ -1447,6 +1469,51 @@ class Flight:
         )
 
         return noisy_pressure, height_above_ground_level
+
+    def _evaluate_parachute_trigger(
+        self, parachute, pressure, height, y, sensors, derivative_func, t
+    ):
+        """Evaluate parachute trigger, passing both sensors and u_dot to wrapper.
+
+        This helper preserves backward compatibility with existing trigger
+        signatures. The wrapper in Parachute always expects (p, h, y, sensors, u_dot)
+        and Flight computes u_dot only when the trigger requests it (optimization).
+
+        Parameters
+        ----------
+        parachute : Parachute
+            Parachute object.
+        pressure : float
+            Noisy pressure value passed to trigger.
+        height : float
+            Height above ground level passed to trigger.
+        y : array
+            State vector at evaluation time.
+        sensors : list
+            Sensors list passed to trigger.
+        derivative_func : callable
+            Function to compute derivatives: derivative_func(t, y)
+        t : float
+            Time at which to evaluate derivatives.
+
+        Returns
+        -------
+        bool
+            True if trigger condition met, False otherwise.
+        """
+        triggerfunc = parachute.triggerfunc
+
+        # Check wrapper metadata for expectations
+        expects_udot = getattr(triggerfunc, "_expects_udot", False)
+
+        # Compute u_dot only if needed (performance optimization)
+        u_dot = None
+        if expects_udot:
+            u_dot = derivative_func(t, y)
+
+        # Call the wrapper with both sensors and u_dot
+        # The wrapper will decide which args to pass to the user's function
+        return triggerfunc(pressure, height, y, sensors, u_dot)
 
     def __init_solution_monitors(self):
         # Initialize solution monitors
@@ -1819,7 +1886,9 @@ class Flight:
         # Hey! We will finish this function later, now we just can use u_dot
         return self.u_dot_generalized(t, u, post_processing=post_processing)
 
-    def u_dot(self, t, u, post_processing=False):  # pylint: disable=too-many-locals,too-many-statements
+    def u_dot(
+        self, t, u, post_processing=False
+    ):  # pylint: disable=too-many-locals,too-many-statements
         """Calculates derivative of u state vector with respect to time
         when rocket is flying in 6 DOF motion during ascent out of rail
         and descent without parachute.
@@ -2385,7 +2454,9 @@ class Flight:
 
         return u_dot
 
-    def u_dot_generalized(self, t, u, post_processing=False):  # pylint: disable=too-many-locals,too-many-statements
+    def u_dot_generalized(
+        self, t, u, post_processing=False
+    ):  # pylint: disable=too-many-locals,too-many-statements
         """Calculates derivative of u state vector with respect to time when the
         rocket is flying in 6 DOF motion in space and significant mass variation
         effects exist. Typical flight phases include powered ascent after launch
@@ -4370,9 +4441,7 @@ class Flight:
             new_index = (
                 index - 1
                 if flight_phase.t < previous_phase.t
-                else index + 1
-                if flight_phase.t > next_phase.t
-                else index
+                else index + 1 if flight_phase.t > next_phase.t else index
             )
             flight_phase.t += adjust
             self.add(flight_phase, new_index)

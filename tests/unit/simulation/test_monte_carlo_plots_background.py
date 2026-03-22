@@ -386,8 +386,8 @@ def test_ellipses_background_handles_bounds2img_failures(
 
         error_message = str(exc_info.value)
         for expected_msg in expected_messages:
-            assert expected_msg in error_message, (
-                f"Expected message '{expected_msg}' not found in error: {error_message}"
-            )
+            assert (
+                expected_msg in error_message
+            ), f"Expected message '{expected_msg}' not found in error: {error_message}"
 
         assert "Esri.WorldImagery" in error_message
