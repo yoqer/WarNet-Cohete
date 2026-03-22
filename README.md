@@ -1,3 +1,9 @@
+# El Proyecto WarNet-Cohete busca el lanzamiento de un Cohete para puesta en Orbita de los Satelites WarNet-Satelital.
+
+Con una capacidad de transportar 8 WarNet-Satelital, intenta ampliar capacidades para llevar al espacio hasta 20 WarNet-Satelitales diseñados específicamente y autónomos independientes.
+
+
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/RocketPy-Team/RocketPy/master/docs/static/RocketPy_Logo_white.png">
   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/RocketPy-Team/RocketPy/master/docs/static/RocketPy_Logo_black.png">
