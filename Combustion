@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Batería de diamante de carbono-14: la energía que durará milenios | Investigación y futuro energético</title>
+    <meta name="description" content="Explora a fondo la primera batería de diamante de carbono-14 del mundo. Descubre su ciencia, creadores (Universidad de Bristol y UKAEA), aplicaciones revolucionarias y el acceso a tesis y publicaciones académicas.">
+    <meta name="keywords" content="batería de diamante, carbono-14, batería nuclear, Universidad de Bristol, UKAEA, tesis, energía nuclear, residuos nucleares, batería de larga duración">
+    <meta name="author" content="Portal de Divulgación Científica">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, 'Segoe UI', 'Roboto', 'Noto Sans', sans-serif;
+            background: linear-gradient(145deg, #f0f4f8 0%, #e6edf4 100%);
+            color: #1a2a3a;
+            line-height: 1.5;
+            scroll-behavior: smooth;
+        }
+
+        /* Layout principal */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* Header */
+        .hero {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem 1rem;
+            background: rgba(255,255,255,0.6);
+            backdrop-filter: blur(8px);
+            border-radius: 48px;
+            box-shadow: 0 12px 28px rgba(0,0,0,0.05);
+        }
+
+        .hero h1 {
+            font-size: 2.6rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #0b2b3b, #1e5a6f);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .hero .tagline {
+            font-size: 1.25rem;
+            color: #2c5368;
+            max-width: 750px;
+            margin: 0 auto;
+            border-top: 1px solid #cbdde6;
+            padding-top: 1rem;
+        }
+
+        /* Grids */
+        .grid-2cols {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .card {
+            background: white;
+            border-radius: 32px;
+            padding: 1.8rem;
+            box-shadow: 0 12px 24px -12px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid rgba(100, 116, 139, 0.12);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 24px 36px -16px rgba(0,0,0,0.18);
+        }
+
+        .card h2 {
+            font-size: 1.7rem;
+            margin-bottom: 1rem;
+            border-left: 5px solid #2c7a5e;
+            padding-left: 1rem;
+            color: #0e3b4b;
+        }
+
+        .card h3 {
+            font-size: 1.3rem;
+            margin: 1.2rem 0 0.6rem 0;
+            color: #1f5e6e;
+        }
+
+        .badge {
+            background: #ebf4f1;
+            color: #1d6f5c;
+            display: inline-block;
+            padding: 0.2rem 0.8rem;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            letter-spacing: 0.3px;
+        }
+
+        /* Listas elegantes */
+        .feature-list {
+            list-style: none;
+            margin: 1rem 0;
+        }
+
+        .feature-list li {
+            margin-bottom: 0.75rem;
+            padding-left: 1.6rem;
+            position: relative;
+        }
+
+        .feature-list li::before {
+            content: "⚡";
+            position: absolute;
+            left: 0;
+            color: #e67e22;
+        }
+
+        .ref-list {
+            list-style: none;
+            margin: 1rem 0;
+        }
+
+        .ref-list li {
+            margin-bottom: 0.7rem;
+            font-size: 0.9rem;
+            background: #f9fbfd;
+            padding: 0.5rem 0.8rem;
+            border-radius: 60px;
+            border-left: 3px solid #3498db;
+        }
+
+        .ref-list a {
+            text-decoration: none;
+            color: #2c7da0;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .ref-list a:hover {
+            color: #1f4e66;
+            text-decoration: underline;
+        }
+
+        /* Sección de citas */
+        .quote {
+            background: #eef3fc;
+            padding: 1.6rem;
+            border-radius: 28px;
+            font-style: italic;
+            margin: 1.5rem 0;
+            border-left: 6px solid #2c7a5e;
+            color: #1a4659;
+            font-weight: 450;
+        }
+
+        /* Tabla de tesis / publicaciones */
+        .thesis-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        }
+
+        .thesis-table th, .thesis-table td {
+            padding: 1rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e2edf2;
+        }
+
+        .thesis-table th {
+            background: #e2f0f5;
+            color: #12516b;
+            font-weight: 600;
+        }
+
+        .thesis-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .pill-link {
+            background: #eef2f5;
+            padding: 0.2rem 0.8rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: inline-block;
+            transition: background 0.2s;
+        }
+
+        .pill-link a {
+            text-decoration: none;
+            color: #1f6392;
+        }
+
+        .pill-link:hover {
+            background: #dbe7ef;
+        }
+
+        /* Footer */
+        .footer-note {
+            text-align: center;
+            margin-top: 4rem;
+            padding: 1.8rem;
+            background: #ffffffcc;
+            backdrop-filter: blur(4px);
+            border-radius: 48px;
+            font-size: 0.85rem;
+            color: #2c5a6e;
+        }
+
+        @media (max-width: 720px) {
+            .container {
+                padding: 1rem;
+            }
+            .hero h1 {
+                font-size: 1.9rem;
+            }
+            .card h2 {
+                font-size: 1.4rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="hero">
+        <h1>⚛️ Batería de diamante de carbono-14<br>5.700 años de energía ininterrumpida</h1>
+        <div class="tagline">
+            Desarrollada por la Universidad de Bristol y la UK Atomic Energy Authority · Primera batería nuclear de diamante del mundo
+        </div>
+    </div>
+
+    <!-- Sección principal: descripción y mecánica -->
+    <div class="grid-2cols">
+        <div class="card">
+            <div class="badge">🔬 INNOVACIÓN CIENTÍFICA</div>
+            <h2>¿Cómo funciona?</h2>
+            <p>La batería de diamante aprovecha la desintegración radiactiva del <strong>carbono-14 (C-14)</strong>, un isótopo con una vida media de 5.730 años. El C-14 encapsulado dentro de un diamante sintético emite electrones de alta velocidad (partículas beta) que, al interactuar con la estructura del diamante —material semiconductor— generan una corriente eléctrica continua y segura. El proceso se asemeja a un panel solar, pero utilizando electrones radiactivos en lugar de fotones[reference:0].</p>
+            <p>El diamante no solo funciona como semiconductor, sino también como <strong>blindaje perfecto</strong>: retiene toda la radiación de corto alcance. De hecho, la radiación externa es <strong>inferior a la emitida por una banana</strong> y absolutamente inocua para humanos o equipos[reference:1]. Además, la batería no contiene partes móviles, no genera emisiones y no requiere ningún mantenimiento durante milenios.</p>
+            <div class="quote">
+                “Al encapsular material radiactivo dentro de diamantes, convertimos un problema de residuos nucleares en una batería de energía limpia que dura miles de años.” — <strong>Prof. Tom Scott, Universidad de Bristol</strong>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="badge">🏛️ INSTITUCIONES LÍDERES</div>
+            <h2>Universidad de Bristol y UKAEA</h2>
+            <p>La batería ha sido creada por un equipo conjunto de científicos e ingenieros de la <strong>Universidad de Bristol (Reino Unido)</strong> y la <strong>Autoridad de Energía Atómica del Reino Unido (UKAEA)</strong>[reference:2]. La Universidad de Bristol propuso el concepto de batería de diamante por primera vez en 2016, mientras que UKAEA aportó su experiencia en plasma de fusión y en la manipulación de materiales radiactivos a gran escala.</p>
+            <p>El equipo construyó una plataforma especializada de deposición por plasma en el <strong>Campus Culham de UKAEA</strong> para “cultivar” diamantes sintéticos que incorporan el carbono-14 extraído de bloques de grafito irradiado de reactores nucleares[reference:3]. La colaboración ha resultado en la primera batería de diamante de carbono-14 probada con éxito a nivel mundial.</p>
+            <h3>🗂️ Líneas de investigación y tesis</h3>
+            <p>Ambas instituciones poseen un sólido historial académico en baterías nucleares y semiconductores de diamante. A continuación se listan algunas publicaciones y tesis directamente relacionadas con esta tecnología:</p>
+            <ul class="feature-list">
+                <li><strong>“A Diamond Gammavoltaic Cell”</strong> – Tesis doctoral (PhD) centrada en células de conversión gamma con diamante[reference:4].</li>
+                <li><strong>“Beta-enhanced thermionic energy converters and nuclear batteries employing nanostructured diamond electrodes”</strong> – Proyecto liderado por el Dr. Neil A. Fox (Universidad de Bristol)[reference:5].</li>
+                <li><strong>Plataforma de crecimiento CVD “static flow”</strong> – Método patentado por la Universidad de Bristol para fabricar diamantes de alta pureza isotópica[reference:6].</li>
+                <li><strong>Publicaciones técnicas de UKAEA y la Universidad de Bristol</strong> – Incluyen múltiples artículos revisados por pares sobre baterías betavoltaicas de diamante y gestión de residuos nucleares[reference:7].</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Aplicaciones reales + visión -->
+    <div class="grid-2cols">
+        <div class="card">
+            <h2>🌍 Aplicaciones que están cambiando el mundo</h2>
+            <p>Gracias a su duración extraordinaria (hasta 5.730 años a media potencia y más de 10.000 años antes de caer por debajo del 50% de carga) y a su seguridad, esta tecnología abre posibilidades antes impensables:</p>
+            <ul class="feature-list">
+                <li><strong>Implantes médicos</strong> – Marcapasos, implantes oculares y audífonos que nunca requieren cirugía para cambiar la batería, eliminando riesgos e incomodidades para los pacientes[reference:8].</li>
+                <li><strong>Exploración espacial</strong> – Sondas, naves espaciales y cargas útiles que necesitan fiabilidad durante décadas o siglos, como las misiones a las lunas de Júpiter o más allá[reference:9].</li>
+                <li><strong>Entornos extremos</strong> – Sensores en el fondo marino, estaciones de vigilancia en zonas remotas o equipos en emplazamientos de difícil acceso donde el reemplazo de pilas es inviable[reference:10].</li>
+                <li><strong>Etiquetas de RF y seguridad</strong> – Sistema de rastreo de objetos y naves espaciales durante periodos interminables, reduciendo residuos electrónicos[reference:11].</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>♻️ Sostenibilidad y residuos nucleares</h2>
+            <p>El carbono-14 empleado se extrae de <strong>bloques de grafito irradiado</strong>, un residuo de centrales nucleares que actualmente representa un desafío de almacenamiento costoso y a largo plazo. Esta innovación no solo genera energía limpia y constante, sino que contribuye a reducir el volumen de residuos peligrosos[reference:12]. Al mismo tiempo, la batería de diamante convierte un pasivo medioambiental en un activo energético.</p>
+            <p>El impacto potencial en la descarbonización y en la economía circular es enorme: baterías que no generan contaminación química, no requieren reciclaje frecuente y operan por milenios sin mantenimiento.</p>
+            <div class="quote">
+                “Las baterías de diamante ofrecen una forma segura y sostenible de proporcionar niveles continuos de energía en microvatios. Utilizan diamante fabricado para encerrar pequeñas cantidades de carbono-14.” — <strong>Sarah Clark, directora del ciclo de combustible de tritio (UKAEA)</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABLA DE TESIS, PATENTES Y DOCUMENTOS ACADÉMICOS -->
+    <div class="card" style="margin: 1rem 0 2rem 0;">
+        <h2>📚 Acceso a tesis, publicaciones y patentes científicas</h2>
+        <p>Consulta investigaciones originales, proyectos doctorales y documentos oficiales sobre la batería de diamante de carbono-14 y tecnologías betavoltaicas de diamante:</p>
+        <table class="thesis-table">
+            <thead>
+                <tr><th>Título / Proyecto</th><th>Tipo / Institución</th><th>Enlace / Referencia</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>A Diamond Gammavoltaic Cell</strong> – G. R. Mackenzie (PhD)</td><td>Universidad de Bristol</td><td class="pill-link"><a href="https://research-information.bris.ac.uk" target="_blank" rel="noopener noreferrer">Ver en el repositorio</a></td></tr>
+                <tr><td><strong>Beta-enhanced thermionic energy converters and nuclear batteries</strong> (Proyecto de investigación)</td><td>Universidad de Bristol / Dr. Neil Fox</td><td class="pill-link"><a href="https://research-information.bris.ac.uk" target="_blank" rel="noopener noreferrer">Acceder a detalles</a></td></tr>
+                <tr><td><strong>Proceso CVD ‘static flow’ para diamantes isotópicamente puros</strong> (Patente)</td><td>Universidad de Bristol</td><td class="pill-link"><a href="https://www.iom3.org" target="_blank" rel="noopener noreferrer">Artículo IOM3</a></td></tr>
+                <tr><td><strong>Investigación de batería de diamante de carbono-14 (UKAEA)</strong></td><td>UKAEA + Universidad de Bristol</td><td class="pill-link"><a href="https://www.ukaea.org" target="_blank" rel="noopener noreferrer">Comunicado UKAEA</a></td></tr>
+                <tr><td><strong>World-first carbon-14 diamond battery – Media Release</strong></td><td>University of Bristol (4 Dic 2024)</td><td class="pill-link"><a href="https://bristol.ac.uk/news/2024/december/diamond-battery-media-release.html" target="_blank" rel="noopener noreferrer">Nota de prensa oficial</a></td></tr>
+            </tbody>
+        </table>
+        <p style="margin-top: 1rem; font-size: 0.85rem;">🔗 Para acceder a las tesis completas, puedes buscar directamente en el repositorio institucional de la Universidad de Bristol (Research Information System) o contactar con los departamentos de Ciencias de Materiales e Ingeniería Nuclear.</p>
+    </div>
+
+    <!-- Desarrollo histórico y futuro -->
+    <div class="grid-2cols">
+        <div class="card">
+            <h2>⏳ Línea de desarrollo: 2016 → 2024</h2>
+            <ul class="feature-list">
+                <li><strong>2016:</strong> Prof. Tom Scott y su equipo de la Universidad de Bristol presentan el primer prototipo de batería de diamante usando níquel-63 y proponen el uso de carbono-14 extraído de residuos de reactores[reference:13].</li>
+                <li><strong>2020–2023:</strong> Colaboración intensiva con UKAEA; se construye la plataforma de deposición de plasma en Culham para crecer diamantes radiactivos de alta pureza.</li>
+                <li><strong>Diciembre de 2024:</strong> Anuncio mundial de la primera batería de diamante de carbono-14 funcional, validada por pruebas de generación de corriente y seguridad radiológica[reference:14].</li>
+                <li><strong>Actualmente:</strong> Los equipos trabajan en escalar la producción para aumentar la potencia (del orden de microvatios a milivatios) y evaluar la integración en dispositivos comerciales y médicos.</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>⚠️ Retos y próximos pasos</h2>
+            <p>A pesar de las maravillosas prestaciones, la batería de diamante suministra hoy <strong>bajas densidades de potencia (microvatios)</strong>, lo que la hace ideal para electrónica de ultra bajo consumo pero aún no para dispositivos de alta potencia. Los próximos hitos incluyen:</p>
+            <ul class="feature-list">
+                <li>Optimización del proceso de fabricación para reducir costes y aumentar el área activa de diamante.</li>
+                <li>Creación de baterías más gruesas o en tándem para multiplicar la corriente disponible.</li>
+                <li>Homologaciones para uso médico y aeroespacial (ensayos de biocompatibilidad y resistencia a ciclos térmicos).</li>
+                <li>Explorar variantes con otros isótopos radiactivos para diferentes rangos de potencia/días.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- INFO FINAL Y REFERENCIAS BIBLIOGRÁFICAS / PERIÓDICAS -->
+    <div class="card" style="margin-top: 1rem;">
+        <h2>📰 Fuentes e información verificada</h2>
+        <p>Esta página ha sido elaborada a partir de múltiples fuentes de divulgación científica, comunicados oficiales de las universidades y prensa especializada, contrastando datos clave sobre la batería de diamante de carbono-14:</p>
+        <ul class="ref-list">
+            <li>📄 <a href="https://bristol.ac.uk/news/2024/december/diamond-battery-media-release.html" target="_blank">Universidad de Bristol – Nota de prensa oficial (Diciembre 2024)</a></li>
+            <li>📄 <a href="https://www.ukaea.org" target="_blank">UK Atomic Energy Authority – Anuncio de la primera batería de diamante de carbono-14</a></li>
+            <li>📄 <a href="https://www.xataka.com/energia/esta-bateria-atomica-supera-cualquier-expectativa-dura-5-700-anos-gracias-al-diamante-carbono-14" target="_blank">Xataka – “Batería atómica: 5.700 años gracias al diamante y carbono-14”</a>[reference:15]</li>
+            <li>📄 <a href="https://www.infobae.com/tecno/2024/12/06/crean-una-bateria-de-diamante-que-dura-miles-de-anos-y-que-revoluciona-el-mundo-de-la-medicina/" target="_blank">Infobae – Aplicaciones médicas y duración milenaria</a>[reference:16]</li>
+            <li>📄 <a href="https://www.eluniverso.com/larevista/tecnologia/cientificos-crean-primera-bateria-de-diamante-y-carbono-14-con-duracion-de-miles-de-anos-nota/" target="_blank">El Universo – Detalles sobre el plasma CVD y los investigadores</a>[reference:17]</li>
+            <li>📄 <a href="https://www.techspot.com/news/105858-scientists-develop-battery-5000-year-lifespan-encasing-radioactive.html" target="_blank">TechSpot – Profundidad sobre semivida y producción</a>[reference:18]</li>
+            <li>📄 <a href="https://es.wikipedia.org/wiki/Baterías_de_nanodiamante" target="_blank">Wikipedia – Baterías de nanodiamante (contexto general)</a>[reference:19]</li>
+        </ul>
+        <p style="margin-top: 1rem;">✅ Toda la información académica y técnica ha sido actualizada con los últimos anuncios de finales de 2024 y principios de 2025. Para acceder a tesis o documentos de investigación específicos, se recomienda usar el repositorio de la Universidad de Bristol o bases como Google Scholar con términos clave “diamond betavoltaic battery” y “carbon-14 diamond battery”.</p>
+    </div>
+
+    <div class="footer-note">
+    
