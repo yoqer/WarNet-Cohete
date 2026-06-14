@@ -4,7 +4,7 @@ Este manual técnico detalla los procedimientos y la mecánica involucrados en e
 
 ## 1. Introducción al Sistema WarNet Satelital
 
-El sistema WarNet Satelital es una constelación de satélites de órbita baja (LEO) diseñada para proporcionar cobertura global de comunicaciones y observación. Su despliegue requiere una precisión extrema para asegurar la formación y el mantenimiento de la constelación. La Nave Hipersónica Orbital Reutilizable actúa como la plataforma de lanzamiento y despliegue principal, aprovechando su capacidad de carga masiva y su sistema de despliegue avanzado.
+El sistema [WarNet Satelital](https://github.com/yoqer/WarNet-Satelital) es una constelación de satélites de órbita baja (LEO) diseñada para proporcionar cobertura global de comunicaciones y observación. Su despliegue requiere una precisión extrema para asegurar la formación y el mantenimiento de la constelación. La Nave Hipersónica Orbital Reutilizable actúa como la plataforma de lanzamiento y despliegue principal, aprovechando su capacidad de carga masiva y su sistema de despliegue avanzado.
 
 ## 2. Fases de la Misión de Despliegue
 
