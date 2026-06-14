@@ -1,4 +1,4 @@
-# Diseño Conceptual de Nave Hipersónica Orbital Reutilizable (Proyecto WarNet Satelital)
+# Diseño Conceptual de Nave Hipersónica Orbital Reutilizable (Lanzamiento WarNet Satelital)
 
 Este documento presenta el diseño conceptual de una nave aeroespacial a gran escala, capaz de alcanzar velocidades hipersónicas (hasta Mach 6+), desplegar satélites en órbita baja y realizar un aterrizaje vertical reutilizable. Integra tecnologías de propulsión combinada, mecanismos avanzados de despliegue de carga y un sistema de control autónomo basado en IA para la misión WarNet Satelital.
 
@@ -71,7 +71,7 @@ La complejidad de una nave de este tipo requiere sistemas de control y navegaci�
 
 ## 5. Despliegue del Sistema WarNet Satelital
 
-El objetivo final de esta nave es el despliegue eficiente y preciso de la constelación WarNet Satelital.
+El objetivo final de esta nave es el despliegue eficiente y preciso de la constelación [WarNet Satelital.](https://github.com/yoqer/WarNet-Satelital)
 
 ### 5.1. Mecánica de Órbita Baja
 
