@@ -142,9 +142,4 @@ El montaje del motor ZupeZ-Zohete se concibe como un proceso modular, facilitand
 
 El motor ZupeZ-Zohete representa un paradigma emergente en la propulsión aeroespacial, fusionando la sostenibilidad del hidrógeno generado a bordo con la eficiencia hipersónica y la versatilidad orbital. Su diseño modular, la gestión dinámica de los depósitos de agua y el innovador sistema de control de actitud por dinámica de fluidos, orquestado por una IA avanzada, lo posicionan como una solución prometedora para las futuras misiones espaciales. Este concepto no solo aborda las limitaciones de los sistemas de propulsión actuales, sino que también abre nuevas vías para la exploración y el uso sostenible del espacio.
 
-## 9. Referencias
-
-[1] Jadish. (s.f.). *Tecnología*. [https://jadish.energy/tecnologia](https://jadish.energy/tecnologia)
-[2] Transportesostenible.com.pe. (2026, Abril 6). *Con el hidrógeno verde extraído de un galón de agua auto logra desplazarse 114 km*. [https://transportesostenible.com.pe/con-el-hidrogeno-verde-extraido-de-un-galon-de-agua-auto-logra-desplazarse-114-km/](https://transportesostenible.com.pe/con-el-hidrogeno-verde-extraido-de-un-galon-de-agua-auto-logra-desplazarse-114-km/)
-
 ---
