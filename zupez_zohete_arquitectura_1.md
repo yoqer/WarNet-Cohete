@@ -100,6 +100,13 @@ El motor ZupeZ-Zohete representa un salto cualitativo en la propulsión aeroespa
 
 ---
 
+
+____________________________________________________________________
+
+
+
+---
+
 ## 6. Estudios Detallados de Peso, Propulsión y Capacidad
 
 Para validar la viabilidad del concepto ZupeZ-Zohete, se requiere un análisis más profundo de sus características de peso, las necesidades de propulsión y la capacidad estimada de la nave.
